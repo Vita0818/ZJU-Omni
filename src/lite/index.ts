@@ -4,6 +4,8 @@ import type { Deadline, Raw } from '../core/util.ts';
 import type { Runtime } from '../platforms/index.ts';
 import type { XzzdServices } from '../platforms/xzzd/index.ts';
 import type { ZdbkServices } from '../platforms/zdbk/index.ts';
+import type { ZhiyunServices } from '../platforms/zhiyun/index.ts';
+import { courseLecturesShape, myLecturesShape, transcriptShape } from '../platforms/zhiyun/tools.ts';
 import { TERMS } from '../platforms/zdbk/parse.ts';
 import { examsShape, gradesShape, timetableShape } from '../platforms/zdbk/tools.ts';
 import { assignmentScanShape, assignmentShape, identifier, searchShape, submissionShape, syncShape } from '../platforms/xzzd/tools.ts';
@@ -234,9 +236,41 @@ function zdbkLite({ client, reader }: ZdbkServices): LiteTool[] {
   ];
 }
 
+function zhiyunLite({ client, reader }: ZhiyunServices): LiteTool[] {
+  const read = <T>(fn: () => Promise<T>) => client.withSession(fn, { readOnly: true });
+  return [
+    {
+      name: 'zju_lectures',
+      title: '课堂回放',
+      description: '列出智云课堂堂次（sub_id）。默认今天；days 往前多查几天；course_id 查整门课。',
+      input: { date: z.string().optional(), days: num.optional(), course_id: num.optional() },
+      strict: { ...myLecturesShape, course_id: courseLecturesShape.course_id.optional() },
+      run: args =>
+        read(async () => {
+          const r = args.course_id != null ? await reader.courseLectures({ course_id: args.course_id }) : await reader.myLectures(args);
+          return { lectures: r.lectures.map(l => ({ sub_id: l.sub_id, course_id: l.course_id, course: l.course_title, title: l.title, time: l.begins_at?.replace(' +08:00', '') ?? l.date, teacher: l.teacher })) };
+        }),
+    },
+    {
+      name: 'zju_transcript',
+      title: '课堂转录',
+      description: '读取某堂课（sub_id）的语音转录文字。长文用 next_offset 续读。',
+      input: { sub_id: num, offset: num.optional() },
+      strict: transcriptShape,
+      defaults: { max_characters: 6000 },
+      run: args =>
+        read(async () => {
+          const r = await reader.transcript(args);
+          return { available: r.available, text: r.text, next_offset: r.next_offset, total: r.total_characters, note: r.available ? undefined : r.note };
+        }),
+    },
+  ];
+}
+
 export function liteTools(runtime: Runtime): LiteTool[] {
   const tools: LiteTool[] = [];
   if (runtime.xzzd) tools.push(...xzzdLite(runtime.xzzd));
   if (runtime.zdbk) tools.push(...zdbkLite(runtime.zdbk));
+  if (runtime.zhiyun) tools.push(...zhiyunLite(runtime.zhiyun));
   return tools;
 }

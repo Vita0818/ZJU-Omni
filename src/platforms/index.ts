@@ -6,6 +6,8 @@ import { createXzzd, type XzzdServices } from './xzzd/index.ts';
 import { xzzdTools } from './xzzd/tools.ts';
 import { createZdbk, type ZdbkServices } from './zdbk/index.ts';
 import { zdbkTools } from './zdbk/tools.ts';
+import { createZhiyun, type ZhiyunServices } from './zhiyun/index.ts';
+import { zhiyunTools } from './zhiyun/tools.ts';
 
 export const PLATFORM_LABELS: Record<PlatformId, string> = {
   xzzd: '学在浙大',
@@ -16,12 +18,13 @@ export const PLATFORM_LABELS: Record<PlatformId, string> = {
   xxt: '学习通',
 };
 
-export const IMPLEMENTED_PLATFORMS: ReadonlySet<PlatformId> = new Set(['xzzd', 'zdbk']);
+export const IMPLEMENTED_PLATFORMS: ReadonlySet<PlatformId> = new Set(['xzzd', 'zdbk', 'zhiyun']);
 
 export interface Runtime {
   ctx: AppContext;
   xzzd?: XzzdServices;
   zdbk?: ZdbkServices;
+  zhiyun?: ZhiyunServices;
   clients: Map<PlatformId, SessionClient>;
   tools: FullTool[];
 }
@@ -37,6 +40,11 @@ export function createRuntime(ctx: AppContext): Runtime {
     runtime.zdbk = createZdbk(ctx);
     runtime.clients.set('zdbk', runtime.zdbk.client);
     runtime.tools.push(...zdbkTools(runtime.zdbk));
+  }
+  if (ctx.cfg.platforms.has('zhiyun')) {
+    runtime.zhiyun = createZhiyun(ctx);
+    runtime.clients.set('zhiyun', runtime.zhiyun.client);
+    runtime.tools.push(...zhiyunTools(runtime.zhiyun));
   }
   return runtime;
 }

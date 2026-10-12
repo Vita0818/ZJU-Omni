@@ -139,7 +139,8 @@ export class HttpClient {
       body = new URLSearchParams(options.form).toString();
       headers.set('content-type', 'application/x-www-form-urlencoded');
     }
-    if (options.cookies !== false) {
+    // Plain-HTTP requests never carry cookies: ZJU SSO cookies are not marked Secure.
+    if (options.cookies !== false && physical.protocol === 'https:') {
       const cookie = this.jar.header(physical);
       if (cookie) headers.set('cookie', cookie);
     }

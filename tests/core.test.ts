@@ -177,3 +177,14 @@ test('missing upstream list fields fail visibly and deadlines keep unknown time 
   assert.equal(deadline('2026-09-15 23:59:00').iso, null);
   assert.equal(deadline(null).raw, null);
 });
+
+test('plain-HTTP requests never carry cookies', async () => {
+  const fetchImpl = mockFetch(() => respond(200, 'ok'));
+  const jar = new CookieJar();
+  jar.setFromHeaders(new URL('https://courses.zju.edu.cn/'), ['iPlanetDirectoryPro=sso; Domain=.zju.edu.cn; Path=/']);
+  const http = new HttpClient({ fetchImpl, jar });
+  await http.request('http://img.cmc.zju.edu.cn/1.jpg');
+  await http.request('https://img.cmc.zju.edu.cn/1.jpg');
+  assert.equal((fetchImpl.calls[0].init.headers as Headers).get('cookie'), null);
+  assert.equal((fetchImpl.calls[1].init.headers as Headers).get('cookie'), 'iPlanetDirectoryPro=sso');
+});

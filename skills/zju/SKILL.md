@@ -1,11 +1,11 @@
 ---
 name: zju
-description: 通过 ZJU-Omni MCP 操作浙大校园平台。当前已接入教务（zdbk_*：课表、成绩绩点、考试，只读）和学在浙大（xzzd_*）：汇总跨课程作业、读取要求和提交记录、检索课程资料、下载与增量同步课件，并按用户明确要求保存草稿、提交或撤回作业。智云、拼题A、CC98、学习通按启用情况逐步接入。
+description: 通过 ZJU-Omni MCP 操作浙大校园平台。当前已接入教务（zdbk_*：课表、成绩绩点、考试，只读）、智云课堂（zhiyun_*：回放堂次、课堂转录、PPT，只读）和学在浙大（xzzd_*）：汇总跨课程作业、读取要求和提交记录、检索课程资料、下载与增量同步课件，并按用户明确要求保存草稿、提交或撤回作业。拼题A、CC98、学习通按启用情况逐步接入。
 ---
 
 # ZJU-Omni（正常版）
 
-工具按平台加前缀：`xzzd_*` 学在浙大（作业、课件、公告默认以这里为准），`zdbk_*` 本科教务（课表、成绩、考试），`zju_auth_*` 跨平台登录管理。其余平台（`zhiyun_*`、`pta_*`、`cc98_*`、`xxt_*`）未出现在工具列表里时表示尚未接入或未启用，不要臆造。
+工具按平台加前缀：`xzzd_*` 学在浙大（作业、课件、公告默认以这里为准），`zdbk_*` 本科教务（课表、成绩、考试），`zhiyun_*` 智云课堂，`zju_auth_*` 跨平台登录管理。其余平台（`pta_*`、`cc98_*`、`xxt_*`）未出现在工具列表里时表示尚未接入或未启用，不要臆造。
 
 ## 登录
 
@@ -32,6 +32,13 @@ description: 通过 ZJU-Omni MCP 操作浙大校园平台。当前已接入教�
 - 考试 `zdbk_list_exams`，`upcoming_only=true` 只看未结束的；`start` 为空表示只排了考试周，如实给出 `time_text`。
 - 教务要求验证码（`AUTH_CHALLENGE_REQUIRED`）时请用户先在浏览器打开教务系统完成一次，再重试。
 - 作业、课件、公告以学在浙大为准，不要用教务数据推断作业。
+
+## 查询（智云课堂）
+
+- 最近上过的课：`zhiyun_my_lectures(date, days)`（只含本人课表）。旁听课或往期课程：`zhiyun_search_courses` 找智云 `course_id`（与学在浙大 ID 不同），再 `zhiyun_list_lectures`。
+- 转录：`zhiyun_get_transcript(sub_id)`，按 `next_offset` 读完再总结；`available=false` 表示暂无转录（当天的课常未转完）。转录是自动识别，引用时说明可能有误。
+- PPT：`zhiyun_get_ppt_timeline` 看页数和时间，`zhiyun_download_ppt` 下载截图到用户指定目录。
+- 课程总结、复习提纲由你基于取回的转录和 PPT 完成；不要声称看过没有读取的部分。
 
 ## 写操作（两步确认）
 
