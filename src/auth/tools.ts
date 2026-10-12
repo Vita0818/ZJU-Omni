@@ -3,6 +3,7 @@ import { ALL_PLATFORMS, type PlatformId } from '../core/config.ts';
 import { ToolError } from '../core/errors.ts';
 import { ACCOUNT_KINDS } from '../core/keychain.ts';
 import type { FullTool } from '../core/tools.ts';
+import { PTA_SETUP } from '../platforms/pta/client.ts';
 import { IMPLEMENTED_PLATFORMS, PLATFORM_LABELS, type Runtime } from '../platforms/index.ts';
 
 const platformEnum = z.enum(ALL_PLATFORMS);
@@ -24,7 +25,10 @@ export async function authStatus(runtime: Runtime, { platform, check = false }: 
       session: stored ? { mode: stored.mode, saved_at: stored.saved_at } : null,
     };
     const client = runtime.clients.get(id);
-    if (check && client) row.live = await client.check();
+    if (id === 'pta' && runtime.pta) {
+      row.cookie = await runtime.pta.client.status();
+      if (check) row.live = await runtime.pta.client.check();
+    } else if (check && client) row.live = await client.check();
     platforms.push(row);
   }
   const webvpn = await ctx.sessions.read('webvpn').catch(() => null);
@@ -40,6 +44,7 @@ export async function authStatus(runtime: Runtime, { platform, check = false }: 
 
 export async function authLogin(runtime: Runtime, platform: PlatformId) {
   if (!runtime.ctx.cfg.platforms.has(platform)) throw new ToolError('PLATFORM_DISABLED', `${PLATFORM_LABELS[platform]} 未启用。请在 ZJU_PLATFORMS 中加入 ${platform}。`);
+  if (platform === 'pta') throw new ToolError('COOKIE_IMPORT_REQUIRED', '拼题A 登录需要短信验证，不做自动登录。请在浏览器登录 pintia.cn 后，在本机终端运行导入命令。', { setup_command: PTA_SETUP });
   const client = runtime.clients.get(platform);
   if (!client) throw new ToolError('PLATFORM_NOT_IMPLEMENTED', `${PLATFORM_LABELS[platform]} 尚未实现登录。`);
   const session = await client.refreshSession();

@@ -5,6 +5,8 @@ import type { Runtime } from '../platforms/index.ts';
 import type { XzzdServices } from '../platforms/xzzd/index.ts';
 import type { ZdbkServices } from '../platforms/zdbk/index.ts';
 import type { ZhiyunServices } from '../platforms/zhiyun/index.ts';
+import type { PtaServices } from '../platforms/pta/index.ts';
+import { problemShape } from '../platforms/pta/tools.ts';
 import { courseLecturesShape, myLecturesShape, transcriptShape } from '../platforms/zhiyun/tools.ts';
 import { courseCodeOfKey, TERMS } from '../platforms/zdbk/parse.ts';
 import { examsShape, gradesShape, timetableShape } from '../platforms/zdbk/tools.ts';
@@ -24,7 +26,26 @@ async function creditMap(zdbk: ZdbkServices): Promise<Map<string, number>> {
   });
 }
 
-function xzzdLite(x: XzzdServices, zdbk?: ZdbkServices): LiteTool[] {
+async function ptaDeadlines(pta: PtaServices) {
+  if (!(await pta.client.status()).configured) return { pta_note: '拼题A 未导入 Cookie，未包含题集截止' };
+  try {
+    const sets = await pta.reader.problemSets({ active_only: true, max_sets: 10 });
+    const items = [];
+    for (const set of sets.problem_sets) {
+      let done: string | undefined;
+      try {
+        const p = await pta.reader.progress(set.id);
+        if (p) done = `${p.accepted}/${p.total}`;
+      } catch {}
+      items.push({ problem_set_id: set.id, name: set.name, due: when(set.ends_at), solved: done });
+    }
+    return { pta: items };
+  } catch (e: any) {
+    return { pta_error: e?.code ?? 'INTERNAL_ERROR' };
+  }
+}
+
+function xzzdLite(x: XzzdServices, zdbk?: ZdbkServices, pta?: PtaServices): LiteTool[] {
   const { client, reader, workflows, materials, actions } = x;
   const read = <T>(fn: () => Promise<T>) => client.withSession(fn, { readOnly: true });
   const write = <T>(fn: () => Promise<T>) => client.withSession(fn, { readOnly: false });
@@ -32,7 +53,7 @@ function xzzdLite(x: XzzdServices, zdbk?: ZdbkServices): LiteTool[] {
     {
       name: 'zju_deadlines',
       title: '作业截止汇总',
-      description: '汇总各课作业截止时间和提交状态。默认 pending（未交/草稿/未知）。',
+      description: '汇总本学期作业截止和提交状态（含拼题A题集截止）。默认 pending。',
       input: { status: z.enum(['pending', 'all', 'submitted']).optional(), due_before: z.string().optional(), course_ids: nums.optional(), offset: num.optional() },
       strict: assignmentScanShape,
       defaults: { status: 'pending', limit: 30 },
@@ -45,6 +66,7 @@ function xzzdLite(x: XzzdServices, zdbk?: ZdbkServices): LiteTool[] {
             next_offset: r.next_offset,
             complete: r.complete,
             error_codes: errorCodes(r.errors),
+            ...(pta && !args.offset ? await ptaDeadlines(pta) : {}),
           };
         }),
     },
@@ -296,9 +318,31 @@ function zhiyunLite({ client, reader }: ZhiyunServices): LiteTool[] {
   ];
 }
 
+function ptaLite({ reader }: PtaServices): LiteTool[] {
+  return [
+    {
+      name: 'pta_problem',
+      title: '拼题A题面',
+      description: '读拼题A题面。只给 problem_set_id 时列出题目；再给 problem_id 读题面。',
+      input: { problem_set_id: z.string(), problem_id: z.string().optional(), offset: num.optional() },
+      strict: { ...problemShape, problem_id: problemShape.problem_id.optional() },
+      defaults: { max_characters: 6000 },
+      run: async args => {
+        if (args.problem_id == null) {
+          const r = await reader.problems({ problem_set_id: args.problem_set_id });
+          return { type: r.type_label, problems: r.problems.map(p => ({ problem_id: p.id, label: p.label, title: p.title, score: p.score, status: p.my_status })), next_page: r.next_page };
+        }
+        const p = await reader.problem(args);
+        return { title: `${p.label ?? ''} ${p.title}`.trim(), type: p.type_label, score: p.score, time_limit_ms: p.time_limit_ms, memory_limit_kb: p.memory_limit_kb, due: when(p.deadline), content: p.content, next_offset: p.next_offset };
+      },
+    },
+  ];
+}
+
 export function liteTools(runtime: Runtime): LiteTool[] {
   const tools: LiteTool[] = [];
-  if (runtime.xzzd) tools.push(...xzzdLite(runtime.xzzd, runtime.zdbk));
+  if (runtime.xzzd) tools.push(...xzzdLite(runtime.xzzd, runtime.zdbk, runtime.pta));
+  if (runtime.pta) tools.push(...ptaLite(runtime.pta));
   if (runtime.zdbk) tools.push(...zdbkLite(runtime.zdbk));
   if (runtime.zhiyun) tools.push(...zhiyunLite(runtime.zhiyun));
   return tools;

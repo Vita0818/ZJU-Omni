@@ -59,11 +59,11 @@ async function actionFixture(t: TestContext) {
   return { root, cfg, store, file, state, reader, activity, actions: new CourseActions(reader) };
 }
 
-test('MCP initializes, advertises 34 full tools, and reports missing login without leaking state', async t => {
+test('MCP initializes, advertises 38 full tools, and reports missing login without leaking state', async t => {
   const dataDir = await tempDir(t);
   const client = await connectServer(t, baseEnv(dataDir));
   const catalog = await client.listTools();
-  assert.equal(catalog.tools.length, 34);
+  assert.equal(catalog.tools.length, 38);
   for (const name of ['zju_auth_status', 'zju_auth_login', 'xzzd_list_all_assignments', 'xzzd_get_assignment', 'xzzd_prepare_draft', 'xzzd_save_draft', 'xzzd_download_submission_file', 'xzzd_search_course_content', 'xzzd_sync_course_materials']) {
     assert.ok(catalog.tools.some(tool => tool.name === name), name);
   }

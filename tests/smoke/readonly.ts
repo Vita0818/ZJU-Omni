@@ -18,7 +18,7 @@ await client.connect(clientSide);
 
 const WRITE = /prepare|submit|save|retract|forget|download|sync/;
 const platformOf = (name: string) => (name.startsWith('zju_auth') ? 'zju' : name.split('_')[0]);
-const LITE_PLATFORM: Record<string, string> = { zju_schedule: 'zdbk', zju_exams: 'zdbk', zju_grades: 'zdbk', zju_lectures: 'zhiyun', zju_transcript: 'zhiyun' };
+const LITE_PLATFORM: Record<string, string> = { pta_problem: 'pta', zju_schedule: 'zdbk', zju_exams: 'zdbk', zju_grades: 'zdbk', zju_lectures: 'zhiyun', zju_transcript: 'zhiyun' };
 const wanted = (name: string) => {
   const platform = lite ? LITE_PLATFORM[name] ?? 'xzzd' : platformOf(name);
   if (platform !== 'zju' && !cfg.platforms.has(platform as any)) return false;
@@ -104,6 +104,23 @@ if (lite) {
     }
   } else if (wanted('zhiyun_x')) {
     process.stdout.write('  (最近 7 天没有智云堂次，跳过转录和 PPT)\n');
+  }
+}
+if (runtime.pta && cfg.platforms.has('pta') && (!only || only.includes('pta'))) {
+  if (!(await runtime.pta.client.status()).configured) process.stdout.write('  (拼题A 未导入 Cookie，跳过 PTA)\n');
+  else if (lite) {
+    const sets = await runtime.pta.reader.problemSets({ max_sets: 5 }).catch(() => null);
+    const first = sets?.problem_sets[0];
+    if (first) await step('pta_problem', { problem_set_id: first.id });
+  } else {
+    const sets = await step('pta_list_problem_sets', {});
+    const first = sets?.problem_sets?.[0];
+    if (first) {
+      await step('pta_get_problem_set', { problem_set_id: first.id });
+      const list = await step('pta_list_problems', { problem_set_id: first.id });
+      const problem = list?.problems?.[0];
+      if (problem) await step('pta_get_problem', { problem_set_id: first.id, problem_id: problem.id, max_characters: 500 });
+    }
   }
 }
 await client.close();

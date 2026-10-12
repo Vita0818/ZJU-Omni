@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { catalogSize } from '../src/core/tools.ts';
 import { baseEnv, connectServer, ROOT, tempDir } from './helpers.ts';
 
-const LITE_TOOLS = ['zju_lectures', 'zju_transcript', 'zju_schedule', 'zju_exams', 'zju_grades', 'zju_deadlines', 'zju_courses', 'zju_assignment', 'zju_materials', 'zju_sync', 'zju_search', 'zju_prepare_submission', 'zju_submit'];
+const LITE_TOOLS = ['pta_problem', 'zju_lectures', 'zju_transcript', 'zju_schedule', 'zju_exams', 'zju_grades', 'zju_deadlines', 'zju_courses', 'zju_assignment', 'zju_materials', 'zju_sync', 'zju_search', 'zju_prepare_submission', 'zju_submit'];
 const LITE_BUDGET = 6000;
 
 test('lite catalog is task-oriented, short and within the fixed character budget', async t => {
@@ -46,13 +46,13 @@ test('lite tools validate against the strict schema and return compact errors', 
 
 test('platform switches remove disabled tools', async t => {
   const dataDir = await tempDir(t);
-  const client = await connectServer(t, baseEnv(dataDir, { ZJU_PLATFORMS: 'zdbk,pta' }));
+  const client = await connectServer(t, baseEnv(dataDir, { ZJU_PLATFORMS: 'zdbk,cc98' }));
   const { tools } = await client.listTools();
   assert.ok(tools.every(tool => !tool.name.startsWith('xzzd_')));
   assert.ok(tools.some(tool => tool.name === 'zdbk_get_timetable'));
   assert.ok(tools.some(tool => tool.name === 'zju_auth_status'));
   const status: any = await client.callTool({ name: 'zju_auth_status', arguments: {} });
-  assert.deepEqual(status.structuredContent.data.platforms.map((p: any) => [p.platform, p.implemented]), [['zdbk', true], ['pta', false]]);
+  assert.deepEqual(status.structuredContent.data.platforms.map((p: any) => [p.platform, p.implemented]), [['zdbk', true], ['cc98', false]]);
   const login: any = await client.callTool({ name: 'zju_auth_login', arguments: { platform: 'xzzd' } });
   assert.equal(login.structuredContent.error.code, 'PLATFORM_DISABLED');
 });

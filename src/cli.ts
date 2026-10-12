@@ -10,6 +10,7 @@ import { safeError } from './core/errors.ts';
 import { ACCOUNT_KINDS, accountLabel, storePasswordInteractively, type AccountKind } from './core/keychain.ts';
 import { catalogSize } from './core/tools.ts';
 import { createRuntime } from './platforms/index.ts';
+import { PtaClient } from './platforms/pta/client.ts';
 
 const USAGE = `用法: zju-omni-cli <命令>
 
@@ -17,6 +18,7 @@ const USAGE = `用法: zju-omni-cli <命令>
   login [平台]                   立即登录指定平台（默认 xzzd）
   status [--check]               查看凭据、会话；--check 对已有会话做只读验证
   forget [平台] [--credentials]  删除会话；--credentials 同时删除钥匙串账号
+  pta-cookie                     从标准输入导入拼题A Cookie（如 pbpaste | … pta-cookie）
   tools [full|lite]              输出工具目录与体积
 
 平台: ${ALL_PLATFORMS.join(', ')}`;
@@ -82,6 +84,16 @@ async function main() {
     }
     case 'tools':
       return catalog(args[0]);
+    case 'pta-cookie': {
+      if (process.stdin.isTTY) throw new Error('请通过管道传入，例如：pbpaste | npm run cli -- pta-cookie');
+      const chunks: Buffer[] = [];
+      for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
+      const ctx = createContext(loadConfig());
+      const pta = new PtaClient(ctx);
+      const saved = await pta.importCookie(Buffer.concat(chunks).toString('utf8'));
+      const check = await pta.check().catch(e => ({ authenticated: false, reason: safeError(e).code }));
+      return print({ imported_from: saved.source, cookie_names: saved.cookie_names, ...check });
+    }
     default:
       process.stdout.write(`${USAGE}\n`);
       if (command && command !== 'help' && command !== '--help') process.exitCode = 2;

@@ -1,11 +1,12 @@
 ---
 name: zju-lite
-description: 浙大校园助手（小模型版）：查课表、考试、成绩、课堂回放转录，查作业截止、课程、作业详情、课件，搜索资料，交作业。
+description: 浙大校园助手（小模型版）：查课表、考试、成绩、课堂回放转录、拼题A题面，查作业截止、课程、作业详情、课件，搜索资料，交作业。
 ---
 
 # 浙大助手
 
 - 课表：`zju_schedule`。考试：`zju_exams`。成绩绩点：`zju_grades`（绩点以官方为准）。
+- 拼题A：`pta_problem` 先给 problem_set_id 列题，再加 problem_id 读题面。报 COOKIE_IMPORT_REQUIRED 时请用户在终端导入 Cookie。
 - 课堂回放：`zju_lectures` 找 sub_id，`zju_transcript` 读转录。
 - 未交作业：`zju_deadlines`。课程：`zju_courses`。作业要求：`zju_assignment`。
 - 课件：`zju_materials` 看列表，`zju_sync` 下载到本地目录。找资料：`zju_search`。
