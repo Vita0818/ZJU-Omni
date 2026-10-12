@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { LiteTool } from '../core/tools.ts';
 import type { Deadline, Raw } from '../core/util.ts';
 import type { Runtime } from '../platforms/index.ts';
+import { beijing, mergeDeadlines, type DeadlineInput } from './deadlines.ts';
 import type { XzzdServices } from '../platforms/xzzd/index.ts';
 import type { ZdbkServices } from '../platforms/zdbk/index.ts';
 import type { ZhiyunServices } from '../platforms/zhiyun/index.ts';
@@ -29,34 +30,44 @@ async function creditMap(zdbk: ZdbkServices): Promise<Map<string, number>> {
   });
 }
 
-async function ptaDeadlines(pta: PtaServices) {
-  if (!(await pta.client.status()).configured) return { pta_note: '拼题A 未导入 Cookie，未包含题集截止' };
+const STATUS_LABELS: Record<string, string> = { unsubmitted: '未交', draft: '草稿', submitted: '已交', unknown: '状态未知' };
+
+async function ptaDeadlines(pta: PtaServices, status: string): Promise<{ items: DeadlineInput[]; note?: string }> {
+  if (!(await pta.client.status()).configured) return { items: [], note: '拼题A 未导入 Cookie，未包含题集' };
   try {
     const sets = await pta.reader.problemSets({ active_only: true, max_sets: 10 });
-    const items = [];
+    const items: DeadlineInput[] = [];
     for (const set of sets.problem_sets) {
-      let done: string | undefined;
+      let progress: { accepted: number; total: number } | null = null;
       try {
-        const p = await pta.reader.progress(set.id);
-        if (p) done = `${p.accepted}/${p.total}`;
+        progress = await pta.reader.progress(set.id);
       } catch {}
-      items.push({ problem_set_id: set.id, name: set.name, due: when(set.ends_at), solved: done });
+      const done = progress != null && progress.total > 0 && progress.accepted >= progress.total;
+      if ((status === 'pending' && done) || (status === 'submitted' && !done)) continue;
+      items.push({ source: '拼题A', course: null, title: set.name, due_iso: set.ends_at.iso, status: done ? '已完成' : '未完成', solved: progress ? `${progress.accepted}/${progress.total}` : undefined, problem_set_id: set.id });
     }
-    return { pta: items };
+    return { items };
   } catch (e: any) {
-    return { pta_error: e?.code ?? 'INTERNAL_ERROR' };
+    return { items: [], note: `拼题A 读取失败（${e?.code ?? 'INTERNAL_ERROR'}）` };
   }
 }
 
-async function xxtDeadlines(xxt: XxtServices) {
-  if (!(await xxt.client.status()).configured) return { xxt_note: '学习通未导入 Cookie，未包含学习通作业' };
+async function xxtDeadlines(xxt: XxtServices, status: string): Promise<{ items: DeadlineInput[]; note?: string }> {
+  if (status === 'submitted') return { items: [] };
+  if (!(await xxt.client.status()).configured) return { items: [], note: '学习通未导入 Cookie，未包含学习通作业' };
   try {
     const r = await xxt.reader.deadlines({ horizon_days: 60, max_courses: 15 });
-    return { xxt: r.items.map(i => ({ course: i.course, title: i.title, due: i.deadline?.replace('T', ' ').slice(0, 16) ?? null, status: i.status })) };
+    return { items: r.items.map(i => ({ source: '学习通' as const, course: i.course, title: i.title, due_iso: i.deadline, status: i.status })) };
   } catch (e: any) {
-    return { xxt_error: e?.code ?? 'INTERNAL_ERROR' };
+    return { items: [], note: `学习通读取失败（${e?.code ?? 'INTERNAL_ERROR'}）` };
   }
 }
+
+// Course codes such as "_uuid_…" are internal identifiers, not useful to show.
+const displayCode = (code: unknown) => {
+  const short = courseCodeOfKey(code) ?? String(code ?? '');
+  return /^[A-Z]{2,}[0-9A-Z]*\d/.test(short) ? short : undefined;
+};
 
 function xzzdLite(x: XzzdServices, zdbk?: ZdbkServices, pta?: PtaServices, xxt?: XxtServices): LiteTool[] {
   const { client, reader, workflows, materials, actions } = x;
@@ -66,21 +77,32 @@ function xzzdLite(x: XzzdServices, zdbk?: ZdbkServices, pta?: PtaServices, xxt?:
     {
       name: 'zju_deadlines',
       title: '作业截止汇总',
-      description: '汇总本学期作业截止和提交状态（含拼题A题集截止）。默认 pending。',
+      description: '本学期作业和拼题A题集截止，已合并并按截止时间排好序。默认未完成。',
       input: { status: z.enum(['pending', 'all', 'submitted']).optional(), due_before: z.string().optional(), course_ids: nums.optional(), offset: num.optional() },
       strict: assignmentScanShape,
       defaults: { status: 'pending', limit: 30 },
       run: args =>
         read(async () => {
-          const r = await workflows.assignments(args);
+          const offset = Number(args.offset ?? 0);
+          const limit = Number(args.limit ?? 30);
+          const r = await workflows.assignments({ ...args, offset: 0, limit: 300 });
+          const inputs: DeadlineInput[] = r.assignments.map(a => ({ source: '学在浙大', course: a.course_name, title: a.title, due_iso: a.deadline?.iso ?? null, status: STATUS_LABELS[a.submission_status] ?? a.submission_status, activity_id: a.id, group: a.is_group }));
+          const notes: string[] = [];
+          for (const extra of [pta ? await ptaDeadlines(pta, args.status) : null, xxt ? await xxtDeadlines(xxt, args.status) : null]) {
+            if (!extra) continue;
+            inputs.push(...extra.items);
+            if (extra.note) notes.push(extra.note);
+          }
+          const now = new Date();
+          const merged = mergeDeadlines(inputs, now);
           return {
-            items: r.assignments.map(a => ({ activity_id: a.id, course: a.course_name, title: a.title, due: when(a.deadline), status: a.submission_status, overdue: a.overdue || undefined, group: a.is_group || undefined })),
-            total: r.matched_count,
-            next_offset: r.next_offset,
-            complete: r.complete,
+            today: beijing(now.toISOString(), false),
+            items: merged.slice(offset, offset + limit),
+            total: merged.length,
+            next_offset: offset + limit < merged.length ? offset + limit : null,
+            complete: r.complete && r.matched_count <= 300,
             error_codes: errorCodes(r.errors),
-            ...(pta && !args.offset ? await ptaDeadlines(pta) : {}),
-            ...(xxt && !args.offset ? await xxtDeadlines(xxt) : {}),
+            note: ['已按截止时间排好序：先列未到期的（最近的在前），再列已过期的，最后是截止时间未知的。按 no 顺序引用即可。', ...notes].join(' '),
           };
         }),
     },
@@ -112,7 +134,7 @@ function xzzdLite(x: XzzdServices, zdbk?: ZdbkServices, pta?: PtaServices, xxt?:
             }
           }
           return {
-            courses: r.courses.map(c => ({ course_id: c.id, name: c.name, code: courseCodeOfKey(c.course_code) ?? c.course_code, credit: credits?.get(String(c.course_code)), semester: c.semester, teachers: c.instructors.join('、') || undefined })),
+            courses: r.courses.map(c => ({ course_id: c.id, name: c.name, code: displayCode(c.course_code), credit: credits?.get(String(c.course_code)), semester: c.semester, teachers: c.instructors.join('、') || undefined })),
             scope,
             next_page: r.next_page,
             credit_error: creditError,
