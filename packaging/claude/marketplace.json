@@ -1,0 +1,16 @@
+{
+  "name": "zju-omni",
+  "owner": {
+    "name": "Vita0818"
+  },
+  "metadata": {
+    "description": "浙大校园平台统一连接器（ZJU-Omni）本地插件市场。"
+  },
+  "plugins": [
+    {
+      "name": "zju-omni",
+      "source": "./zju-omni",
+      "description": "浙大校园平台统一连接器（ZJU-Omni）。"
+    }
+  ]
+}

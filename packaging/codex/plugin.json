@@ -1,0 +1,26 @@
+{
+  "name": "zju-omni",
+  "version": "0.1.0",
+  "description": "浙大校园平台统一连接器：学在浙大作业与课件、教务课表成绩考试、智云课堂转录与 PPT。",
+  "author": { "name": "Vita0818", "url": "https://github.com/Vita0818" },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "ZJU-Omni",
+    "shortDescription": "学在浙大、教务、智云课堂一站式查询，作业两步确认提交。",
+    "longDescription": "本地 MCP 连接器。统一认证凭据存于本机钥匙串，自动登录，校外自动走 WebVPN。支持跨课程作业汇总、课件同步、作业草稿／提交／撤回（预览后执行并回读核对），教务课表、成绩绩点、考试安排，智云课堂回放、语音转录与 PPT。",
+    "developerName": "Vita0818",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write"],
+    "defaultPrompt": [
+      "汇总我本学期还没交的作业，按截止时间排序。",
+      "这周有哪些考试？考场和座位号是什么？",
+      "把今天下午那节课的智云转录整理成笔记。"
+    ],
+    "brandColor": "#005CAA"
+  },
+  "mcpServers": "./.mcp.json",
+  "keywords": ["zju", "tronclass", "zdbk", "classroom", "mcp"],
+  "license": "MIT",
+  "homepage": "https://github.com/Vita0818/ZJU-Omni",
+  "repository": "https://github.com/Vita0818/ZJU-Omni"
+}

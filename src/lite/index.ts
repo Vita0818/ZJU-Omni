@@ -6,7 +6,7 @@ import type { XzzdServices } from '../platforms/xzzd/index.ts';
 import type { ZdbkServices } from '../platforms/zdbk/index.ts';
 import type { ZhiyunServices } from '../platforms/zhiyun/index.ts';
 import { courseLecturesShape, myLecturesShape, transcriptShape } from '../platforms/zhiyun/tools.ts';
-import { TERMS } from '../platforms/zdbk/parse.ts';
+import { courseCodeOfKey, TERMS } from '../platforms/zdbk/parse.ts';
 import { examsShape, gradesShape, timetableShape } from '../platforms/zdbk/tools.ts';
 import { assignmentScanShape, assignmentShape, identifier, searchShape, submissionShape, syncShape } from '../platforms/xzzd/tools.ts';
 
@@ -15,7 +15,16 @@ const nums = z.array(num);
 const when = (d: Deadline | null | undefined) => d?.shanghai ?? d?.raw ?? null;
 const errorCodes = (errors: Raw[] | undefined) => (errors?.length ? errors.slice(0, 5).map(e => e.error?.code ?? e.code) : undefined);
 
-function xzzdLite(x: XzzdServices): LiteTool[] {
+async function creditMap(zdbk: ZdbkServices): Promise<Map<string, number>> {
+  return zdbk.client.withSession(async () => {
+    const map = new Map<string, number>();
+    for (const g of (await zdbk.reader.grades()).grades) map.set(g.course_key, g.credit);
+    for (const e of (await zdbk.reader.exams()).exams) if (e.credit != null && Number.isFinite(e.credit)) map.set(e.course_key, e.credit);
+    return map;
+  });
+}
+
+function xzzdLite(x: XzzdServices, zdbk?: ZdbkServices): LiteTool[] {
   const { client, reader, workflows, materials, actions } = x;
   const read = <T>(fn: () => Promise<T>) => client.withSession(fn, { readOnly: true });
   const write = <T>(fn: () => Promise<T>) => client.withSession(fn, { readOnly: false });
@@ -42,15 +51,35 @@ function xzzdLite(x: XzzdServices): LiteTool[] {
     {
       name: 'zju_courses',
       title: '我的课程',
-      description: '列出我的课程及 course_id，可按名称或 semester_id 筛选。',
-      input: { keyword: z.string().optional(), semester_id: num.optional(), page: num.optional() },
-      strict: { keyword: z.string().max(120).default(''), semester_id: identifier.optional(), page: z.number().int().min(1).max(1000).default(1), page_size: z.number().int().min(1).max(100).default(20) },
+      description: '列出本学期课程（course_id、代码、学分）。keyword 按名称搜全部学期。',
+      input: { keyword: z.string().optional(), semester_id: num.optional(), all_semesters: z.boolean().optional(), page: num.optional() },
+      strict: { keyword: z.string().max(120).default(''), semester_id: identifier.optional(), all_semesters: z.boolean().default(false), page: z.number().int().min(1).max(1000).default(1), page_size: z.number().int().min(1).max(100).default(30) },
       run: args =>
         read(async () => {
-          const r = await reader.courses(args);
+          let semester_id = args.semester_id;
+          let scope = semester_id != null ? 'semester' : 'all';
+          if (semester_id == null && !args.keyword && !args.all_semesters) {
+            const active = (await reader.semesters()).semesters.filter(s => s.is_active === true);
+            if (active.length === 1) {
+              semester_id = active[0].id;
+              scope = `current:${active[0].name}`;
+            }
+          }
+          const r = await reader.courses({ ...args, semester_id });
+          let credits: Map<string, number> | null = null;
+          let creditError: string | undefined;
+          if (zdbk && r.courses.length) {
+            try {
+              credits = await creditMap(zdbk);
+            } catch (e: any) {
+              creditError = e?.code ?? 'INTERNAL_ERROR';
+            }
+          }
           return {
-            courses: r.courses.map(c => ({ course_id: c.id, name: c.name, code: c.course_code, semester: c.semester, teachers: c.instructors.join('、') || undefined })),
+            courses: r.courses.map(c => ({ course_id: c.id, name: c.name, code: courseCodeOfKey(c.course_code) ?? c.course_code, credit: credits?.get(String(c.course_code)), semester: c.semester, teachers: c.instructors.join('、') || undefined })),
+            scope,
             next_page: r.next_page,
+            credit_error: creditError,
           };
         }),
     },
@@ -122,10 +151,10 @@ function xzzdLite(x: XzzdServices): LiteTool[] {
     {
       name: 'zju_search',
       title: '搜索课程资料',
-      description: '跨课程搜索活动标题、附件名和正文（不含附件内部文字）。',
-      input: { keyword: z.string(), course_ids: nums.optional(), semester_id: num.optional(), offset: num.optional() },
+      description: '搜索本学期课程活动标题和附件名；include_body=true 连正文一起搜（较慢）。',
+      input: { keyword: z.string(), include_body: z.boolean().optional(), course_ids: nums.optional(), semester_id: num.optional(), offset: num.optional() },
       strict: searchShape,
-      defaults: { limit: 20 },
+      defaults: { limit: 20, include_body: false },
       run: args =>
         read(async () => {
           const r = await workflows.search(args);
@@ -269,7 +298,7 @@ function zhiyunLite({ client, reader }: ZhiyunServices): LiteTool[] {
 
 export function liteTools(runtime: Runtime): LiteTool[] {
   const tools: LiteTool[] = [];
-  if (runtime.xzzd) tools.push(...xzzdLite(runtime.xzzd));
+  if (runtime.xzzd) tools.push(...xzzdLite(runtime.xzzd, runtime.zdbk));
   if (runtime.zdbk) tools.push(...zdbkLite(runtime.zdbk));
   if (runtime.zhiyun) tools.push(...zhiyunLite(runtime.zhiyun));
   return tools;

@@ -15,9 +15,10 @@
 | 2 | 学在浙大迁移（原 `zju-tronclass` 24 个工具 → 3 个 `zju_auth_*` + 21 个 `xzzd_*`） | 完成（真机只读冒烟通过） |
 | 3 | 教务（ZDBK）：课表、成绩与绩点、考试安排（只读，4 个 `zdbk_*`） | 完成（真机只读冒烟通过） |
 | 4 | 智云课堂：我的堂次、课程堂次、课堂转录、PPT 时间轴与截图下载（6 个 `zhiyun_*`） | 完成（真机只读冒烟通过） |
-| 5–8 | lite 补全与客户端包装、PTA、CC98、学习通 | 未开始 |
+| 5 | lite 补全（课程学分）、技能文档、Codex / Claude Code / DSH / 通用客户端包装、本地模型固定题实测 | 完成（ornith-1.5-9b 10/10，见 [docs/lite-eval.md](docs/lite-eval.md)） |
+| 6–8 | PTA、CC98、学习通 | 未开始 |
 
-full 档目前 34 个工具。lite 档 13 个：`zju_deadlines`、`zju_courses`、`zju_assignment`、`zju_materials`、`zju_sync`、`zju_search`、`zju_prepare_submission`、`zju_submit`（学在浙大），`zju_schedule`、`zju_exams`、`zju_grades`（教务），`zju_lectures`、`zju_transcript`（智云）。
+full 档目前 34 个工具。lite 档 13 个（工具目录 3,802 字符）：`zju_deadlines`、`zju_courses`、`zju_assignment`、`zju_materials`、`zju_sync`、`zju_search`、`zju_prepare_submission`、`zju_submit`（学在浙大），`zju_schedule`、`zju_exams`、`zju_grades`（教务），`zju_lectures`、`zju_transcript`（智云）。
 
 ## 安装
 
@@ -32,7 +33,18 @@ npm run login              # 可选：立即验证登录
 
 已经配置过 `zju-tronclass` 的机器会自动只读复用它的钥匙串账号，无需重新配置（`status` 中显示 `legacy-zju-tronclass`）。
 
-MCP 客户端配置示例见 [packaging/mcp.json](packaging/mcp.json)：`node /绝对路径/dist/server.js`，stdio。
+## 客户端接入
+
+`npm run package -- <codex|claude|dsh|all>` 在 `build/` 下生成各客户端的包装（`build/` 不进仓库）：
+
+| 客户端 | 生成物 | 安装 |
+| --- | --- | --- |
+| Codex | `build/codex/zju-omni/`：`.codex-plugin/plugin.json`、`.mcp.json`、`skills/zju`、`dist`、生产依赖（Codex 会把插件复制进缓存，所以自包含） | 在 `~/.agents/plugins/marketplace.json` 加一条本地来源，`codex plugin add zju-omni@personal`（命令会打印具体条目） |
+| Claude Code | `build/claude/`：本地插件市场 + `zju-omni/` 插件（`.claude-plugin/plugin.json`、`.mcp.json` 用 `${CLAUDE_PLUGIN_ROOT}`、`skills/zju`） | `claude plugin marketplace add <build/claude 绝对路径>`，`claude plugin install zju-omni@zju-omni` |
+| DSH | `build/dsh/zju-omni.cordis.patch.yml`：`dsh-mcp-client`（lite，工具超时 120 s）+ `dsh-skill-filesystem`（只加载 `zju-lite`） | 把片段追加到 `~/.dsh/profiles/<profile>/cordis.patch.yml`，重启 DSH。工具名形如 `mcp__zju__zju_deadlines` |
+| 其他 MCP 客户端 | [packaging/mcp.json](packaging/mcp.json) | `node /绝对路径/dist/server.js`，stdio；`MCP_TOOL_PROFILE` 选 full 或 lite |
+
+包装模板在 `packaging/`，生成脚本是 `scripts/package.ts`。
 
 ## 环境变量
 
@@ -55,6 +67,7 @@ npm run cli -- tools [full|lite]               # 工具目录与字符数
 npm test                                       # 单元 + MCP 协议测试（无网络）
 npm run typecheck
 npm run smoke [-- --lite] [-- --only=zhiyun]   # 真机只读冒烟：只调用读工具，只输出计数、错误码和字段名
+npm run eval:lite -- --model=ornith-1.5-9b     # 本地模型固定题实测（需 LM Studio 服务），写操作被拦截
 ```
 
 ## 设计要点
@@ -77,9 +90,9 @@ src/
   lite/        小模型版任务型工具
   app.ts       组装服务；server.ts stdio 入口；cli.ts 命令行
 skills/        zju/（正常版）、zju-lite/（小模型版，≤1.5 KB）
-packaging/     mcp.json 通用示例（Codex / Claude Code / DSH 包装在第 5 阶段）
+packaging/     codex/、claude/、dsh/ 包装模板，mcp.json 通用示例；scripts/package.ts 生成 build/
 docs/          xzzd/、zdbk/、zhiyun/ 接口适配记录
-tests/         node:test 单元与协议测试、smoke/ 真机只读脚本
+tests/         node:test 单元与协议测试、smoke/ 真机只读脚本、lite-eval/ 本地模型固定题
 ```
 
 ## 致谢与许可

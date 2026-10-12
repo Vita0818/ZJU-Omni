@@ -20,7 +20,9 @@
     "login": "node dist/cli.js login",
     "status": "node dist/cli.js status",
     "test": "node --test --test-concurrency=4 \"tests/**/*.test.ts\"",
-    "smoke": "node tests/smoke/readonly.ts"
+    "smoke": "node tests/smoke/readonly.ts",
+    "package": "npm run build && node scripts/package.ts",
+    "eval:lite": "node tests/lite-eval/run.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",

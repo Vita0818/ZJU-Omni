@@ -66,7 +66,8 @@ export class ZdbkClient extends SessionClient implements ZdbkApi {
     }
     const status = response.status;
     if (status >= 300 && status < 400) throw new ToolError('LOGIN_REQUIRED', '教务系统会话已失效。');
-    if (status === 401) throw new ToolError('LOGIN_REQUIRED', '教务系统会话已失效。');
+    // 正方 returns non-standard 901/902 when the session has expired.
+    if (status === 401 || status === 901 || status === 902) throw new ToolError('LOGIN_REQUIRED', '教务系统会话已失效。');
     if (status === 403) throw new ToolError('FORBIDDEN', '教务系统拒绝访问该功能。');
     if (status === 429) throw new ToolError('RATE_LIMITED', '教务系统请求过于频繁，请稍后再试。');
     if (!response.ok) throw new ToolError('PLATFORM_ERROR', `教务系统返回 HTTP ${status}。`, { http_status: status, endpoint: path });

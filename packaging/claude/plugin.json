@@ -1,0 +1,10 @@
+{
+  "name": "zju-omni",
+  "version": "0.1.0",
+  "description": "浙大校园平台统一连接器：学在浙大作业与课件、教务课表成绩考试、智云课堂转录与 PPT。",
+  "author": { "name": "Vita0818", "url": "https://github.com/Vita0818" },
+  "homepage": "https://github.com/Vita0818/ZJU-Omni",
+  "repository": "https://github.com/Vita0818/ZJU-Omni",
+  "license": "MIT",
+  "keywords": ["zju", "tronclass", "zdbk", "classroom", "mcp"]
+}
