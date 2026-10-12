@@ -131,7 +131,7 @@ test('CC98 goes through WebVPN when the API is unreachable directly', async t =>
     if (url.pathname === '/do-login') return respond(200, { success: true }, { 'set-cookie': 'wengine_vpn_ticketwebvpn_zju_edu_cn=t; Path=/' });
     return site(fromWebvpnUrl(url)!, init);
   });
-  const { ctx } = await testContext(t, { env: { CC98_USERNAME: 'tester', CC98_PASSWORD: 'cc98-secret', ZJU_USERNAME: 'z', ZJU_PASSWORD: 'p' }, fetchImpl });
+  const { ctx } = await testContext(t, { env: { CC98_USERNAME: 'tester', CC98_PASSWORD: 'cc98-secret', WEBVPN_USERNAME: 'z', WEBVPN_PASSWORD: 'p' }, fetchImpl });
   const r = await new Cc98Reader(new Cc98Client(ctx)).search({ keyword: '选课' });
   assert.equal(r.topics.length, 1);
   assert.ok(fetchImpl.calls.some(c => c.url.hostname === 'webvpn.zju.edu.cn' && fromWebvpnUrl(c.url)?.hostname === 'api.cc98.org'));

@@ -11,7 +11,7 @@
 
 | 阶段 | 内容 | 状态 |
 | --- | --- | --- |
-| 1 | 骨架与公共层：统一认证（CAS）、WebVPN、钥匙串、档位与平台开关、限速、体积测试 | 完成（直连已真机验证；WebVPN 登录被拒，待确认上网账号密码） |
+| 1 | 骨架与公共层：统一认证（CAS）、WebVPN、钥匙串、档位与平台开关、限速、体积测试 | 完成（直连已真机验证；WebVPN 待配置上网账号后验证） |
 | 2 | 学在浙大迁移（原 `zju-tronclass` 24 个工具 → 3 个 `zju_auth_*` + 21 个 `xzzd_*`） | 完成（真机只读冒烟通过） |
 | 3 | 教务（ZDBK）：课表、成绩与绩点、考试安排（只读，4 个 `zdbk_*`） | 完成（真机只读冒烟通过） |
 | 4 | 智云课堂：我的堂次、课程堂次、课堂转录、PPT 时间轴与截图下载（6 个 `zhiyun_*`） | 完成（真机只读冒烟通过） |
@@ -34,7 +34,7 @@ npm run login              # 可选：立即验证登录
 pbpaste | npm run cli -- pta-cookie   # 拼题A：浏览器登录后复制任一 /api 请求的 cURL 或 Cookie，再运行
 npm run configure -- cc98             # CC98 论坛账号（可选）
 pbpaste | npm run cli -- xxt-cookie   # 学习通（需 ZJU_PLATFORMS 含 xxt）：浏览器登录后复制 cURL 或 Cookie
-npm run configure -- webvpn           # 可选：WebVPN 上网账号密码与统一认证不同时单独配置
+npm run configure -- webvpn           # 校外访问需要：WebVPN 用“上网账号”，与统一认证是两套系统
 ```
 
 已经配置过 `zju-tronclass` 的机器会自动只读复用它的钥匙串账号，无需重新配置（`status` 中显示 `legacy-zju-tronclass`）。
@@ -58,7 +58,7 @@ npm run configure -- webvpn           # 可选：WebVPN 上网账号密码与统
 | --- | --- | --- |
 | `MCP_TOOL_PROFILE` | `full` / `lite`，其他值启动报错 | `full` |
 | `ZJU_PLATFORMS` | 逗号分隔：`xzzd,zdbk,zhiyun,pta,cc98,xxt` | `xzzd,zdbk,zhiyun,pta,cc98`（`xxt` 需显式加入） |
-| `ZJU_NETWORK` | `auto`（先直连，不通走 WebVPN）/ `direct` / `webvpn` | `auto` |
+| `ZJU_NETWORK` | `auto`（先直连，不通走 WebVPN）/ `direct` / `webvpn`。WebVPN 使用单独配置的上网账号 | `auto` |
 | `ZJU_OMNI_DATA_DIR` | 会话、预览计划等本地状态目录 | `~/.local/share/zju-omni` |
 | `ZJU_USERNAME` / `ZJU_PASSWORD` | 不用钥匙串时的替代（需自行保护启动环境） | — |
 | `WEBVPN_USERNAME` / `WEBVPN_PASSWORD`、`CC98_USERNAME` / `CC98_PASSWORD` | 对应账号的环境变量替代 | — |

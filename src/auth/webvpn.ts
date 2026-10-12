@@ -104,7 +104,7 @@ export async function loginWebvpn(http: HttpClient, credentials: { username: str
   if (code === 'TOO_MANY_ATTEMPTS' || code === 'IP_FORBIDDEN' || code === 'WEEK_PASSWORD_FORBID') {
     throw new ToolError('AUTH_BLOCKED', code === 'WEEK_PASSWORD_FORBID' ? 'WebVPN 以弱密码为由拒绝登录，请先在浏览器修改密码。' : 'WebVPN 暂时阻止了登录（尝试过多或 IP 受限），请稍后在浏览器登录确认。', details);
   }
-  throw new ToolError('AUTHENTICATION_REQUIRED', 'WebVPN 未接受本次登录。WebVPN 使用“上网账号”，其密码可能与统一认证不同；如是，请运行 npm run configure -- webvpn 单独配置。不会自动重试。', details);
+  throw new ToolError('AUTHENTICATION_REQUIRED', 'WebVPN 未接受本次登录。WebVPN 使用“上网账号”（与统一认证是两套系统），请运行 npm run configure -- webvpn 检查配置。不会自动重试。', details);
 }
 
 export async function isCampusNetwork(fetchImpl: typeof fetch = fetch): Promise<boolean | null> {

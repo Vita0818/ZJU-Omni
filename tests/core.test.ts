@@ -154,7 +154,7 @@ test('a rejected WebVPN login is not resubmitted by later automatic calls', asyn
     posts++;
     return respond(200, { success: false, error: 'INVALID_ACCOUNT', message: 'x' });
   });
-  const env = { ZJU_OMNI_DATA_DIR: dir, ZJU_OMNI_LEGACY_DIR: '', ZJU_MIN_INTERVAL_MS: '0', ZJU_USERNAME: 'u', ZJU_PASSWORD: 'p' };
+  const env = { ZJU_OMNI_DATA_DIR: dir, ZJU_OMNI_LEGACY_DIR: '', ZJU_MIN_INTERVAL_MS: '0', WEBVPN_USERNAME: 'u', WEBVPN_PASSWORD: 'p' };
   const ctx = createContext(loadConfig(env), { env, fetchImpl });
   await assert.rejects(() => ctx.network.loginWebvpn(), (e: any) => e.code === 'AUTHENTICATION_REQUIRED' && e.details.platform_error === 'INVALID_ACCOUNT');
   await assert.rejects(() => ctx.network.loginWebvpn(), (e: any) => /不再自动重试/.test(e.message));

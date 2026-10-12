@@ -134,6 +134,7 @@ test('auto network falls back to WebVPN when the platform is unreachable directl
     if (url.pathname === '/login') return respond(200, '<input name="_csrf" value="c">');
     if (url.pathname === '/do-login') {
       webvpnLogins++;
+      assert.equal(new URLSearchParams(String(init.body)).get('username'), 'net-account');
       return respond(200, { success: true }, { 'set-cookie': 'wengine_vpn_ticketwebvpn_zju_edu_cn=ticket; Path=/' });
     }
     assert.match((init.headers as Headers).get('cookie') ?? '', /wengine_vpn_ticket/);
@@ -145,7 +146,7 @@ test('auto network falls back to WebVPN when the platform is unreachable directl
     headers.set('location', toWebvpnUrl(new URL(location, logical)).toString());
     return new Response(null, { status: response.status, headers });
   });
-  const { ctx } = await testContext(t, { env: CREDS, fetchImpl });
+  const { ctx } = await testContext(t, { env: { ...CREDS, WEBVPN_USERNAME: 'net-account', WEBVPN_PASSWORD: 'net-password' }, fetchImpl });
   const client = new XzzdClient(ctx);
   const session = await client.refreshSession();
   assert.equal(session.mode, 'webvpn');
@@ -156,6 +157,15 @@ test('auto network falls back to WebVPN when the platform is unreachable directl
   assert.deepEqual(courses.courses, []);
   const last = fetchImpl.calls.at(-1)!;
   assert.equal(last.url.hostname, 'webvpn.zju.edu.cn');
+});
+
+test('WebVPN never falls back to the unified identity password', async t => {
+  const fetchImpl = mockFetch(() => {
+    throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ENETUNREACH' } });
+  });
+  const { ctx } = await testContext(t, { env: CREDS, fetchImpl });
+  await assert.rejects(() => new XzzdClient(ctx).refreshSession(), (e: any) => e.code === 'CONFIGURATION_REQUIRED' && e.details.account === 'webvpn');
+  assert.ok(fetchImpl.calls.every(c => c.url.pathname !== '/do-login'));
 });
 
 test('an expired read refreshes once and retries only the read', async t => {

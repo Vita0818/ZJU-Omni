@@ -20,7 +20,7 @@ export const KEYCHAIN_SERVICES: Record<AccountKind, string> = {
 
 const ACCOUNT_LABELS: Record<AccountKind, string> = {
   zju: '浙大统一认证',
-  webvpn: 'WebVPN 上网账号',
+  webvpn: 'WebVPN 上网账号（非统一认证）',
   cc98: 'CC98',
   xxt: '学习通',
 };

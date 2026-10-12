@@ -134,7 +134,8 @@ export class NetworkManager {
     if (!explicit) this.assertNoRecentFailure('webvpn');
     if (!this.webvpnLoggingIn) {
       this.webvpnLoggingIn = (async () => {
-        const kind = (await this.ctx.accounts.status('webvpn')).configured ? 'webvpn' : 'zju';
+        // WebVPN uses the campus network account, a separate system from unified identity.
+        const kind = 'webvpn';
         if (!(await this.ctx.accounts.status(kind)).configured) await this.ctx.accounts.load(kind);
         const jar = new CookieJar();
         const http = this.client('direct', jar, 'webvpn');
