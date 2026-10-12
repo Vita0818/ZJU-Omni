@@ -21,7 +21,16 @@ test('course list, homework detail and status parsing follow the web pages', () 
 });
 
 test('deadlines read only pending homework details and sort by due time', async t => {
-  const fetchImpl = mockFetch(url => {
+  let seenBounce = false;
+  const fetchImpl = mockFetch((url, init) => {
+    if (url.hostname === 'i.chaoxing.com' && url.protocol === 'https:' && url.pathname === '/base' && !seenBounce) {
+      seenBounce = true;
+      return respond(302, '', { location: 'http://i.chaoxing.com/base' });
+    }
+    if (url.hostname === 'i.chaoxing.com' && url.protocol === 'http:') {
+      assert.equal((init.headers as Headers).get('cookie'), null);
+      return respond(301, '', { location: 'https://i.chaoxing.com/base' });
+    }
     if (url.hostname === 'i.chaoxing.com') return respond(200, 'var fid = \'427\'', { 'content-type': 'text/html' });
     if (url.pathname.endsWith('/courselistdata')) return respond(200, COURSE_HTML, { 'content-type': 'text/html' });
     if (url.pathname.endsWith('/stucoursemiddle')) return respond(200, MIDDLE, { 'content-type': 'text/html' });
@@ -48,7 +57,7 @@ test('deadlines read only pending homework details and sort by due time', async 
 });
 
 test('a login page response is reported as an expired cookie', async t => {
-  const fetchImpl = mockFetch(() => respond(302, '', { location: 'https://passport2.chaoxing.com/login?refer=x' }));
+  const fetchImpl = mockFetch(url => (url.hostname === 'passport2.chaoxing.com' ? respond(200, '<title>用户登录</title>', { 'content-type': 'text/html' }) : respond(302, '', { location: 'https://passport2.chaoxing.com/login?refer=x' })));
   const { ctx } = await testContext(t, { fetchImpl });
   const client = new XxtClient(ctx);
   await client.importCookie('UID=1; _uid=1; fid=427');

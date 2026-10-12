@@ -1,6 +1,6 @@
 # 学习通接口适配记录
 
-整理日期：2026-10-12。请求形态与页面解析移植自 `~/ThirdParty/XXT-mcp/zju-chaoxing`（MIT；上游 © Wu Jiale，补充 © Vita0818）。默认不加载，需在 `ZJU_PLATFORMS` 中加入 `xxt`。真机验证需要先导入 Cookie。
+整理日期：2026-10-12。请求形态与页面解析移植自 `~/ThirdParty/XXT-mcp/zju-chaoxing`（MIT；上游 © Wu Jiale，补充 © Vita0818）。默认不加载，需在 `ZJU_PLATFORMS` 中加入 `xxt`。2026-10-12 已用真实账号只读验证。
 
 ## 登录
 
@@ -16,7 +16,7 @@ Cookie 存为 `sessions/xxt.json`（600），domain 记为 `chaoxing.com`，只�
 
 | 功能 | 地址 | 说明 |
 | --- | --- | --- |
-| 基础信息 / fid | `GET https://i.chaoxing.com/base` | 页面里取 `fid` |
+| 基础信息 / fid | `GET https://i.chaoxing.com/base` | 页面里取 `fid`。实测会先跳到 `http://` 再跳回 https，客户端在 chaoxing.com 内跟随最多 5 次跳转，http 那一跳不带 Cookie |
 | 课程列表 | `GET mooc2-ans…/visit/courselistdata?courseType=1&courseFid=&courseTeacherid=0&courseOrderBy=0` | HTML，按 `stucoursemiddle?courseid&clazzid&cpi` 解析 |
 | 课程中间页 | `GET mooc1…/visit/stucoursemiddle?courseid&clazzid&cpi&ismooc2=1&v=2` | 隐藏域 `workEnc`、`openc`、`enc` |
 | 作业列表 | `GET mooc1…/mooc2/work/list?courseId&classId&cpi&ut=s&openc&enc=<workEnc>&t&stuenc=<enc>&isdisplaytable=2` | `goTask` 条目：详情链接、标题、状态；进度 `done/total` |

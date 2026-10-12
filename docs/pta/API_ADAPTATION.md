@@ -1,6 +1,6 @@
 # 拼题A 接口适配记录
 
-整理日期：2026-10-12。接口路径与 [jinzcdev/vscode-pintia](https://github.com/jinzcdev/vscode-pintia)（MIT）核对；Cookie 解析沿用 `Pintia-mcp`。2026-10-12 已用公开题集（id 12）匿名验证题集、题目列表、题面；个人题集与进度需导入 Cookie 后验证。
+整理日期：2026-10-12。接口路径与 [jinzcdev/vscode-pintia](https://github.com/jinzcdev/vscode-pintia)（MIT）核对；Cookie 解析沿用 `Pintia-mcp`。2026-10-12 已用公开题集（id 12）匿名验证题集、题目列表、题面；导入 Cookie 后个人题集、进度也已验证。
 
 ## 登录
 

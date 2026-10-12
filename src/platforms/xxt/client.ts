@@ -67,6 +67,7 @@ export class XxtClient implements XxtApi {
   }
 
   private check(target: URL, response: HttpResponse): string {
+    if (response.url.hostname === 'passport2.chaoxing.com') throw new ToolError('COOKIE_EXPIRED', '学习通登录已失效，请重新导入 Cookie。', { setup_command: XXT_SETUP });
     if (response.status >= 300 && response.status < 400) {
       if (response.location && /passport2\.chaoxing\.com/.test(response.location.hostname)) throw new ToolError('COOKIE_EXPIRED', '学习通登录已失效，请重新导入 Cookie。', { setup_command: XXT_SETUP });
       throw new ToolError('UNEXPECTED_RESPONSE', '学习通返回了意外的跳转。');
@@ -83,7 +84,9 @@ export class XxtClient implements XxtApi {
     if (target.protocol !== 'https:' || !(target.hostname === 'chaoxing.com' || target.hostname.endsWith('.chaoxing.com'))) throw new ToolError('INVALID_PATH', '只允许学习通（chaoxing.com）地址。');
     const http = new HttpClient({ jar: await this.jar(), limiter: this.limiter, limiterKey: 'xxt', timeoutMs: this.ctx.cfg.timeoutMs, fetchImpl: this.ctx.fetchImpl });
     try {
-      return this.check(target, await http.request(target, { method, query, form, headers: { Referer: 'https://mooc1.chaoxing.com/' }, maxBytes: 8 * 1024 * 1024 }));
+      // Some pages bounce through http:// and back (cookies are never sent over http).
+      const allowUrl = (u: URL) => (u.hostname === 'chaoxing.com' || u.hostname.endsWith('.chaoxing.com')) && (u.protocol === 'https:' || u.protocol === 'http:') && !u.username && !u.password;
+      return this.check(target, await http.request(target, { method, query, form, headers: { Referer: 'https://mooc1.chaoxing.com/' }, maxBytes: 8 * 1024 * 1024, maxRedirects: 5, allowUrl }));
     } catch (e) {
       if (e instanceof ToolError && e.code === 'NETWORK_ERROR') throw new ToolError('NETWORK_ERROR', '无法连接学习通，请检查网络。', e.details);
       throw e;

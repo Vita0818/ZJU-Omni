@@ -1,6 +1,6 @@
 # CC98 接口适配记录
 
-整理日期：2026-10-12。登录流程和只读接口参考 [EviterLesRoses2/cc98-mcp](https://github.com/EviterLesRoses2/cc98-mcp)（MIT，上游 Lucent-Snow/CC98-CLI），写接口参考本地 cc98-desktop 前端（`src/lib/api.ts`）。真机验证需要配置 CC98 账号；校外需要 WebVPN。
+整理日期：2026-10-12。登录流程和只读接口参考 [EviterLesRoses2/cc98-mcp](https://github.com/EviterLesRoses2/cc98-mcp)（MIT，上游 Lucent-Snow/CC98-CLI），写接口参考本地 cc98-desktop 前端（`src/lib/api.ts`）。2026-10-12 读接口已经 WebVPN 真机验证；写接口只有模拟测试。
 
 ## 登录
 
