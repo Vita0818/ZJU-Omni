@@ -124,7 +124,7 @@ if (runtime.pta && cfg.platforms.has('pta') && (!only || only.includes('pta'))) 
   }
 }
 if (runtime.cc98 && cfg.platforms.has('cc98') && (!only || only.includes('cc98'))) {
-  if (!(await runtime.cc98.ctx.accounts.status('cc98')).configured) process.stdout.write('  (CC98 账号未配置，跳过 CC98；npm run configure -- cc98)\n');
+  if (!(await runtime.ctx.accounts.status('cc98')).configured) process.stdout.write('  (CC98 账号未配置，跳过 CC98；npm run configure -- cc98)\n');
   else if (lite) {
     const found = await step('cc98_search', { keyword: '选课' });
     const topic = found?.topics?.[0];
