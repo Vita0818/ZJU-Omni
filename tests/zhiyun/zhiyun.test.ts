@@ -35,7 +35,7 @@ function fakeApi(routes: Record<string, (q: Record<string, unknown>) => any>) {
 test('my lectures cover the requested day range, deduplicate and accept map-shaped lists', async () => {
   const api = fakeApi({
     '/courseapi/v2/course-live/get-my-course-day': q => q.day === '2026-10-12'
-      ? { code: 0, list: { a: { course: [{ id: 11, title: '数据结构', sub_id: 101, sub_title: '第5周 周一 3-4节', realname: '张老师', class_begin: 1791765600 }] } } }
+      ? { code: 0, list: { a: { section: '上午', course: {} }, b: { section: '下午', course: { 0: { id: 11, title: '数据结构', sub_id: 101, sub_title: '第5周 周一 3-4节', realname: '张老师', course_begin: '1791765600', room_name: '东1A-101' } } } } }
       : { code: 0, list: [{ course: [{ id: 11, title: '数据结构', sub_id: 101, sub_title: 'dup' }, { id: 12, title: '微积分', sub_id: 102, sub_title: '第5周 周日' }] }] },
   });
   const reader = new ZhiyunReader(api, () => new Date('2026-10-12T04:00:00Z'));
@@ -43,6 +43,7 @@ test('my lectures cover the requested day range, deduplicate and accept map-shap
   assert.deepEqual(api.calls.map(c => c.query.day), ['2026-10-12', '2026-10-11']);
   assert.deepEqual(r.lectures.map(l => [l.sub_id, l.date]), [['101', '2026-10-12'], ['102', '2026-10-11']]);
   assert.match(r.lectures[0].begins_at!, /\+08:00$/);
+  assert.equal(r.lectures[0].room, '东1A-101');
   await assert.rejects(() => reader.myLectures({ date: '2026/10/12' }), (e: any) => e.code === 'INVALID_ARGUMENT');
 });
 
@@ -79,9 +80,9 @@ test('transcripts are timestamped, paged by characters, and missing data is not 
 });
 
 test('PPT pages are de-duplicated across repeated pages and keep timing when present', async () => {
-  const slide = (n: number, extra: Record<string, unknown> = {}) => ({ content: JSON.stringify({ pptimgurl: `http://img.cmc.zju.edu.cn/${n}.jpg`, ...extra }), created_sec: 1791700000 + n });
+  const slide = (n: number, sec: number) => ({ content: JSON.stringify({ pptimgurl: `http://img.cmc.zju.edu.cn/${n}.jpg`, created: sec }), created_sec: sec, create_time: '' });
   const api = fakeApi({
-    '/pptnote/v1/schedule/search-ppt': () => ({ code: 0, total: 3, list: [slide(1, { offset_sec: 30 }), slide(2), slide(2), slide(3)] }),
+    '/pptnote/v1/schedule/search-ppt': () => ({ code: 0, total: 3, list: [slide(1, 30), slide(2, 1015394), slide(2, 1015394), slide(3, 3725)] }),
   });
   const reader = new ZhiyunReader(api);
   const r = await reader.slides({ course_id: 11, sub_id: 101 });
@@ -89,7 +90,8 @@ test('PPT pages are de-duplicated across repeated pages and keep timing when pre
   assert.equal(r.complete, true);
   assert.equal(r.slides[0].offset, '00:00:30');
   assert.equal(r.slides[1].offset, null);
-  assert.match(r.slides[0].captured_at!, /\+08:00$/);
+  assert.equal(r.slides[2].offset, '01:02:05');
+  assert.equal(r.slides[0].captured_at, null);
   assert.equal(api.calls.length, 1);
   const root = await tempDirFor();
   const saved = await reader.downloadSlides({ course_id: 11, sub_id: 101, output_dir: root.dir });

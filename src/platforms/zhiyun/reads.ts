@@ -40,6 +40,7 @@ export interface Lecture {
   teacher: string | null;
   begins_at: string | null;
   date: string | null;
+  room?: string | null;
 }
 
 export interface Slide {
@@ -63,8 +64,10 @@ function flattenSubs(value: unknown, out: Raw[] = []): Raw[] {
   return out;
 }
 
-const OFFSET_KEYS = ['offset_sec', 'video_sec', 'second', 'sec', 'begin_sec', 'time_sec', 'play_time'];
-const CREATED_KEYS = ['created_sec', 'create_time', 'created_at', 'ctime', 'time'];
+// created_sec / content.created: seconds into the recording (verified 2026-10-12).
+const OFFSET_KEYS = ['created_sec', 'created', 'offset_sec'];
+const CREATED_KEYS = ['create_time', 'created_at'];
+const MAX_OFFSET_SEC = 12 * 3600;
 
 export class ZhiyunReader {
   readonly api: ZhiyunApi & { image?(url: string, maxBytes: number): Promise<{ bytes: Buffer; contentType: string }> };
@@ -115,6 +118,7 @@ export class ZhiyunReader {
         sub_id: String(s.id ?? s.sub_id),
         title: text(s.sub_title),
         teacher: text(s.lecturer_name ?? s.realname) || null,
+        room: text(s.room_name) || null,
         begins_at: unixToShanghai(begin),
         date: Number.isFinite(begin) && begin > 0 ? dateOnly.format(new Date(begin * 1000)) : null,
         ...(Number.isFinite(begin) && begin > now ? { upcoming: true } : {}),
@@ -139,7 +143,8 @@ export class ZhiyunReader {
         throw new ToolError('SCHEMA_CHANGED', '智云课堂当天课程缺少 list。');
       }
       for (const group of groups as Raw[]) {
-        for (const c of (group?.course ?? []) as Raw[]) {
+        const courses = group?.course == null ? [] : Array.isArray(group.course) ? group.course : Object.values(group.course);
+        for (const c of courses as Raw[]) {
           const subId = String(c.sub_id ?? '');
           if (!subId || seen.has(subId)) continue;
           seen.add(subId);
@@ -149,7 +154,8 @@ export class ZhiyunReader {
             sub_id: subId,
             title: text(c.sub_title),
             teacher: text(c.realname ?? c.lecturer_name) || null,
-            begins_at: unixToShanghai(c.class_begin ?? c.start_at),
+            room: text(c.room_name) || null,
+            begins_at: unixToShanghai(c.course_begin ?? c.class_begin),
             date: day,
           });
         }
@@ -208,8 +214,9 @@ export class ZhiyunReader {
         if (!url || seen.has(url)) continue;
         seen.add(url);
         added++;
-        const offsetKey = OFFSET_KEYS.find(k => Number.isFinite(Number(content[k] ?? item[k])) && (content[k] ?? item[k]) !== '' && (content[k] ?? item[k]) != null);
-        const offsetSec = offsetKey ? Number(content[offsetKey] ?? item[offsetKey]) : null;
+        const offsetKey = OFFSET_KEYS.find(k => (item[k] ?? content[k]) != null && (item[k] ?? content[k]) !== '' && Number.isFinite(Number(item[k] ?? content[k])));
+        const rawOffset = offsetKey ? Number(item[offsetKey] ?? content[offsetKey]) : null;
+        const offsetSec = rawOffset != null && rawOffset >= 0 && rawOffset <= MAX_OFFSET_SEC ? rawOffset : null;
         const createdKey = CREATED_KEYS.find(k => (item[k] ?? content[k]) != null && (item[k] ?? content[k]) !== '');
         const created = createdKey ? item[createdKey] ?? content[createdKey] : null;
         slides.push({
@@ -228,7 +235,7 @@ export class ZhiyunReader {
       total_reported: total || slides.length,
       complete: slides.length >= total,
       slides,
-      note: 'PPT 为课堂录像自动截图，可能有重复页。offset 为录像内相对时间（若平台提供）。',
+      note: 'PPT 为课堂录像自动截图，可能有重复页。offset 为截图在录像中的时间（时:分:秒）；平台给出异常值时为 null。',
     };
   }
 

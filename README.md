@@ -14,7 +14,7 @@
 | 1 | 骨架与公共层：统一认证（CAS）、WebVPN、钥匙串、档位与平台开关、限速、体积测试 | 完成（直连已真机验证；WebVPN 待验证） |
 | 2 | 学在浙大迁移（原 `zju-tronclass` 24 个工具 → 3 个 `zju_auth_*` + 21 个 `xzzd_*`） | 完成（真机只读冒烟通过） |
 | 3 | 教务（ZDBK）：课表、成绩与绩点、考试安排（只读，4 个 `zdbk_*`） | 完成（真机只读冒烟通过） |
-| 4 | 智云课堂：我的堂次、课程堂次、课堂转录、PPT 时间轴与截图下载（6 个 `zhiyun_*`） | 完成（待真机只读冒烟） |
+| 4 | 智云课堂：我的堂次、课程堂次、课堂转录、PPT 时间轴与截图下载（6 个 `zhiyun_*`） | 完成（真机只读冒烟通过） |
 | 5–8 | lite 补全与客户端包装、PTA、CC98、学习通 | 未开始 |
 
 full 档目前 34 个工具。lite 档 13 个：`zju_deadlines`、`zju_courses`、`zju_assignment`、`zju_materials`、`zju_sync`、`zju_search`、`zju_prepare_submission`、`zju_submit`（学在浙大），`zju_schedule`、`zju_exams`、`zju_grades`（教务），`zju_lectures`、`zju_transcript`（智云）。
