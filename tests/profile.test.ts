@@ -66,3 +66,45 @@ test('invalid configuration stops the server at startup', async t => {
     assert.match(result.stderr, /zju-omni:/);
   }
 });
+
+test('lite answers an identical repeated read with a nudge instead of re-querying', async () => {
+  const { McpServer } = await import('@modelcontextprotocol/sdk/server/mcp.js');
+  const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
+  const { InMemoryTransport } = await import('@modelcontextprotocol/sdk/inMemory.js');
+  const { registerLite } = await import('../src/core/tools.ts');
+  const { z } = await import('zod');
+  let calls = 0;
+  let clock = 0;
+  const server = new McpServer({ name: 't', version: '1' });
+  registerLite(server, [{ name: 'probe', title: 'p', description: 'p', input: { q: z.string() }, strict: { q: z.string() }, run: async () => ({ n: ++calls }) }], () => clock);
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  await server.connect(b);
+  const client = new Client({ name: 'c', version: '1' });
+  await client.connect(a);
+  const call = async (q: string) => JSON.parse(((await client.callTool({ name: 'probe', arguments: { q } })) as any).content[0].text);
+  assert.deepEqual(await call('x'), { n: 1 });
+  assert.equal((await call('x')).repeated_call, true);
+  assert.deepEqual(await call('y'), { n: 2 });
+  clock += 200000;
+  assert.deepEqual(await call('y'), { n: 3 });
+  assert.equal(calls, 3);
+  await client.close();
+});
+
+test('lite flags a changed argument that produced the identical result', async () => {
+  const { McpServer } = await import('@modelcontextprotocol/sdk/server/mcp.js');
+  const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
+  const { InMemoryTransport } = await import('@modelcontextprotocol/sdk/inMemory.js');
+  const { registerLite } = await import('../src/core/tools.ts');
+  const { z } = await import('zod');
+  const server = new McpServer({ name: 't', version: '1' });
+  registerLite(server, [{ name: 'list', title: 'l', description: 'l', input: { offset: z.number() }, strict: { offset: z.number() }, run: async () => ({ items: [1, 2] }) }], () => 0);
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  await server.connect(b);
+  const client = new Client({ name: 'c', version: '1' });
+  await client.connect(a);
+  const call = async (offset: number) => JSON.parse(((await client.callTool({ name: 'list', arguments: { offset } })) as any).content[0].text);
+  assert.deepEqual(await call(0), { items: [1, 2] });
+  assert.equal((await call(3)).same_result_as_previous, true);
+  await client.close();
+});

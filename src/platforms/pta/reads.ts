@@ -97,6 +97,25 @@ export class PtaReader {
     return { ...this.summarize(set, exam), description: text(set.description) || null, problem_types: types, progress, summaries_error: summaries.error ?? null };
   }
 
+  /** Every problem of every type in one list (for small models that should not page by type). */
+  async allProblems({ problem_set_id, max_problems = 80 }: { problem_set_id: unknown; max_problems?: number }) {
+    const id = ptaId(problem_set_id, '题集 ID');
+    const summaries = await this.api.get(`/api/problem-sets/${id}/problem-summaries`);
+    const types = Object.keys(summaries.summaries ?? {}).sort((a, b) => PROBLEM_TYPES.indexOf(a as ProblemType) - PROBLEM_TYPES.indexOf(b as ProblemType));
+    const problems: (Awaited<ReturnType<PtaReader['problems']>>['problems'][number] & { type_label: string })[] = [];
+    let truncated = false;
+    for (const type of types) {
+      if (problems.length >= max_problems) {
+        truncated = true;
+        break;
+      }
+      const r = await this.problems({ problem_set_id: id, problem_type: type as ProblemType, limit: Math.min(200, max_problems - problems.length) });
+      problems.push(...r.problems.map(p => ({ ...p, type_label: r.type_label ?? type })));
+      if (r.next_page) truncated = true;
+    }
+    return { problem_set_id: id, total: problems.length, truncated, problems };
+  }
+
   async problems({ problem_set_id, problem_type, page = 1, limit = 50 }: { problem_set_id: unknown; problem_type?: ProblemType; page?: number; limit?: number }) {
     const id = ptaId(problem_set_id, '题集 ID');
     let type = problem_type;

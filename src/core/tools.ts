@@ -34,14 +34,15 @@ function annotations(tool: ToolBehavior) {
 
 const DROPPED_KEYS = new Set(['url', 'source_url', 'meta']);
 
-export function compactValue(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(compactValue);
+// Top-level empty lists are kept: a bare "{}" reads like a failure to small models.
+export function compactValue(value: unknown, depth = 0): unknown {
+  if (Array.isArray(value)) return value.map(item => compactValue(item, depth + 1));
   if (!value || typeof value !== 'object') return value;
   const out: Record<string, unknown> = {};
   for (const [key, item] of Object.entries(value)) {
     if (item === null || item === undefined || DROPPED_KEYS.has(key)) continue;
-    if (Array.isArray(item) && item.length === 0) continue;
-    out[key] = compactValue(item);
+    if (Array.isArray(item) && item.length === 0 && depth > 0) continue;
+    out[key] = compactValue(item, depth + 1);
   }
   return out;
 }
@@ -76,13 +77,32 @@ export function registerFull(server: McpServer, tools: FullTool[]): void {
   }
 }
 
-export function registerLite(server: McpServer, tools: LiteTool[]): void {
+export const REPEAT_WINDOW_MS = 120000;
+
+/**
+ * Small models sometimes loop on an identical call. In the lite profile an
+ * exact repeat of the previous successful read within two minutes is answered
+ * with a short nudge instead of re-querying the platform.
+ */
+export function registerLite(server: McpServer, tools: LiteTool[], now: () => number = Date.now): void {
+  let last: { signature: string; at: number; tool: string; result: string } | null = null;
   for (const tool of tools) {
     server.registerTool(tool.name, { title: tool.title, description: tool.description, inputSchema: tool.input, annotations: annotations(tool) }, async (args: any) => {
       try {
         const parsed = strictArgs(tool.strict, { ...(tool.defaults ?? {}), ...stripUndefined(args) });
-        const data = await tool.run(parsed);
-        return { content: [{ type: 'text' as const, text: JSON.stringify(compactValue(data)) }] };
+        const signature = `${tool.name}:${JSON.stringify(parsed)}`;
+        const readOnly = tool.readOnly ?? true;
+        if (readOnly && last && last.signature === signature && now() - last.at < REPEAT_WINDOW_MS) {
+          last.at = now();
+          return { content: [{ type: 'text' as const, text: JSON.stringify({ repeated_call: true, note: '这次调用与上一次完全相同，结果不会变化，见上一次返回。请直接根据上一次结果回答用户，不要再调用。' }) }] };
+        }
+        const text = JSON.stringify(compactValue(await tool.run(parsed)));
+        const sameResult = readOnly && last && last.tool === tool.name && last.result === text && now() - last.at < REPEAT_WINDOW_MS;
+        last = readOnly ? { signature, at: now(), tool: tool.name, result: text } : null;
+        if (sameResult) {
+          return { content: [{ type: 'text' as const, text: JSON.stringify({ same_result_as_previous: true, note: '参数变了但结果与上一次完全相同，说明这个参数对该操作不起作用。请直接根据上一次结果回答用户。' }) }] };
+        }
+        return { content: [{ type: 'text' as const, text }] };
       } catch (e) {
         return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: compactValue(safeError(e)) }) }] };
       }

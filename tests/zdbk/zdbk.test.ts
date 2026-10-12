@@ -147,6 +147,11 @@ test('ZDBK responses: captcha, login page, redirects and null timetables are cla
     if (mode === 'captcha') return respond(200, '"captcha_error"', { 'content-type': 'text/plain' });
     if (mode === 'login') return respond(200, '<html><form action="/cas/login"><input name="password"></form></html>', { 'content-type': 'text/html' });
     if (mode === 'redirect') return respond(302, '', { location: 'https://zjuam.zju.edu.cn/cas/login' });
+    if (mode === 'busy-once') {
+      mode = 'grades-ok';
+      return { status: 922, headers: new Headers(), body: null } as unknown as Response;
+    }
+    if (mode === 'grades-ok') return respond(200, { items: [] });
     if (mode === '901') return { status: 901, headers: new Headers(), body: null } as unknown as Response;
     if (mode === 'null') return respond(200, 'null', { 'content-type': 'application/json' });
     return respond(200, '<html>maintenance</html>', { 'content-type': 'text/html' });
@@ -163,6 +168,11 @@ test('ZDBK responses: captcha, login page, redirects and null timetables are cla
   await assert.rejects(() => run(() => reader.exams()), (e: any) => e.code === 'LOGIN_REQUIRED');
   mode = '901';
   await assert.rejects(() => run(() => reader.grades()), (e: any) => e.code === 'LOGIN_REQUIRED');
+  mode = 'busy-once';
+  client.retryDelayMs = 0;
+  fetchImpl.calls.length = 0;
+  assert.equal((await run(() => reader.grades())).grades.length, 0);
+  assert.equal(fetchImpl.calls.length, 2);
   mode = 'null';
   assert.equal((await run(() => reader.timetable({ academic_year: '2025-2026', term: '夏' }))).sessions.length, 0);
   mode = 'other';

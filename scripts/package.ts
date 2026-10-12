@@ -58,6 +58,15 @@ async function claude() {
       claude plugin install zju-omni@zju-omni`);
 }
 
+// A stable node path (e.g. /opt/homebrew/bin/node) survives upgrades better than the versioned execPath.
+function nodePath(): string {
+  for (const dir of (process.env.PATH ?? '').split(':')) {
+    const candidate = join(dir, 'node');
+    if (dir && existsSync(candidate)) return candidate;
+  }
+  return process.execPath;
+}
+
 async function dsh() {
   const target = join(BUILD, 'dsh');
   if (!existsSync(join(ROOT, 'dist/server.js'))) throw new Error('dist/ 不存在，请先运行 npm run build。');
@@ -65,7 +74,7 @@ async function dsh() {
   await cp(join(ROOT, 'skills', 'zju-lite'), join(target, 'skills', 'zju-lite'), { recursive: true });
   const template = await readFile(join(ROOT, 'packaging/dsh/zju-omni.cordis.patch.yml'), 'utf8');
   const quote = (value: string) => value.replace(/'/g, "''");
-  const patch = template.replaceAll('__NODE__', `'${quote(process.execPath)}'`).replaceAll('__ROOT__', quote(ROOT)).replaceAll('__SKILLS__', quote(join(target, 'skills')));
+  const patch = template.replaceAll('__NODE__', `'${quote(nodePath())}'`).replaceAll('__ROOT__', quote(ROOT)).replaceAll('__SKILLS__', quote(join(target, 'skills')));
   await writeFile(join(target, 'zju-omni.cordis.patch.yml'), patch);
   console.log(`DSH 配置片段已生成：${join(target, 'zju-omni.cordis.patch.yml')}
 安装：把其中的条目追加到 ~/.dsh/profiles/<profile>/cordis.patch.yml（例如 desktop），重启 DSH。`);

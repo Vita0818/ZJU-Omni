@@ -184,7 +184,7 @@ test('WebVPN login submits once, stores the ticket and stops on captcha or confi
 });
 
 test('lite helpers compact output and validate against strict schemas', () => {
-  assert.deepEqual(compactValue({ a: null, b: [], url: 'https://x', source_url: 'y', c: false, d: 0, e: [{ url: 'y', f: 1, g: null }] }), { c: false, d: 0, e: [{ f: 1 }] });
+  assert.deepEqual(compactValue({ a: null, b: [], url: 'https://x', source_url: 'y', c: false, d: 0, e: [{ url: 'y', f: 1, g: null, h: [] }] }), { b: [], c: false, d: 0, e: [{ f: 1 }] });
   assert.throws(() => strictArgs({ id: z.number().int().positive() }, { id: -1 }), (e: any) => e.code === 'INVALID_ARGUMENT');
 });
 

@@ -187,7 +187,7 @@ function xzzdLite(x: XzzdServices, zdbk?: ZdbkServices, pta?: PtaServices, xxt?:
     {
       name: 'zju_search',
       title: '搜索课程资料',
-      description: '搜索本学期课程活动标题和附件名；include_body=true 连正文一起搜（较慢）。',
+      description: '搜索学在浙大课程资料（活动标题、附件名）；include_body=true 连正文（较慢）。',
       input: { keyword: z.string(), include_body: z.boolean().optional(), course_ids: nums.optional(), semester_id: num.optional(), offset: num.optional() },
       strict: searchShape,
       defaults: { limit: 20, include_body: false },
@@ -244,7 +244,6 @@ function xzzdLite(x: XzzdServices, zdbk?: ZdbkServices, pta?: PtaServices, xxt?:
   ];
 }
 
-const shortTime = (iso: string | null) => (iso ? iso.slice(5, 16).replace('T', ' ') : null);
 const periodRange = (periods: number[]) => (periods.length > 1 ? `${periods[0]}-${periods[periods.length - 1]}` : String(periods[0]));
 
 function zdbkLite({ client, reader }: ZdbkServices): LiteTool[] {
@@ -276,7 +275,10 @@ function zdbkLite({ client, reader }: ZdbkServices): LiteTool[] {
       run: args =>
         read(async () => {
           const r = await reader.exams(args);
-          return { exams: r.exams.map(e => ({ course: e.name, type: e.type === 'midterm' ? '期中' : '期末', time: e.start ? `${shortTime(e.start)}-${e.end!.slice(11, 16)}` : e.time_text, place: e.location, seat: e.seat })) };
+          return {
+            exams: r.exams.map(e => ({ course: e.name, type: e.type === 'midterm' ? '期中' : '期末', time: e.start ? `${e.start.slice(0, 10)} ${e.start.slice(11, 16)}-${e.end!.slice(11, 16)}` : e.time_text, place: e.location ?? '未公布', seat: e.seat ?? '未公布' })),
+            note: r.exams.length ? '“未公布”表示教务尚未排定考场或座位，这是完整结果，无需重复查询。' : '没有符合条件的考试。',
+          };
         }),
     },
     {
@@ -337,14 +339,14 @@ function ptaLite({ reader }: PtaServices): LiteTool[] {
     {
       name: 'pta_problem',
       title: '拼题A题面',
-      description: '读拼题A题面。只给 problem_set_id 时列出题目；再给 problem_id 读题面。',
+      description: '拼题A：只给 problem_set_id 列出全部题目；再给 problem_id 读题面。',
       input: { problem_set_id: z.string(), problem_id: z.string().optional(), offset: num.optional() },
       strict: { ...problemShape, problem_id: problemShape.problem_id.optional() },
       defaults: { max_characters: 6000 },
       run: async args => {
         if (args.problem_id == null) {
-          const r = await reader.problems({ problem_set_id: args.problem_set_id });
-          return { type: r.type_label, problems: r.problems.map(p => ({ problem_id: p.id, label: p.label, title: p.title, score: p.score, status: p.my_status })), next_page: r.next_page };
+          const r = await reader.allProblems({ problem_set_id: args.problem_set_id });
+          return { total: r.total, problems: r.problems.map(p => ({ problem_id: p.id, label: p.label, type: p.type_label, title: p.title.slice(0, 60), score: p.score, status: p.my_status })), truncated: r.truncated || undefined, note: '这是全部题目，无需翻页。读题面请再传 problem_id。' };
         }
         const p = await reader.problem(args);
         return { title: `${p.label ?? ''} ${p.title}`.trim(), type: p.type_label, score: p.score, time_limit_ms: p.time_limit_ms, memory_limit_kb: p.memory_limit_kb, due: when(p.deadline), content: p.content, next_offset: p.next_offset };
@@ -358,7 +360,7 @@ function cc98Lite({ reader }: Cc98Services): LiteTool[] {
     {
       name: 'cc98_search',
       title: 'CC98搜帖',
-      description: '按关键词搜索 CC98 帖子标题，返回 topic_id。',
+      description: '搜索 CC98 论坛帖子（网友讨论）。找课程资料用 zju_search。',
       input: { keyword: z.string(), from: num.optional() },
       strict: cc98SearchShape,
       defaults: { size: 15 },

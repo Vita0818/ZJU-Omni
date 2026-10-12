@@ -3,7 +3,7 @@ import type { StoredCookie } from '../../core/cookies.ts';
 import { ToolError } from '../../core/errors.ts';
 import type { HttpClient } from '../../core/http.ts';
 import { SessionClient } from '../../core/session.ts';
-import type { Raw } from '../../core/util.ts';
+import { sleep, type Raw } from '../../core/util.ts';
 
 export const ZDBK_HOST = 'zdbk.zju.edu.cn';
 export const ZDBK_BASE = `https://${ZDBK_HOST}/jwglxt`;
@@ -49,7 +49,20 @@ export class ZdbkClient extends SessionClient implements ZdbkApi {
     }
   }
 
-  async post(path: string, { query, form = {}, allowNull = false }: { query?: Record<string, unknown>; form?: Record<string, string>; allowNull?: boolean } = {}): Promise<Raw | null> {
+  /** All ZDBK calls here are queries; a transient 9xx refusal is retried once after a short pause. */
+  async post(path: string, options: { query?: Record<string, unknown>; form?: Record<string, string>; allowNull?: boolean } = {}): Promise<Raw | null> {
+    try {
+      return await this.postOnce(path, options);
+    } catch (e) {
+      if (!(e instanceof ToolError && e.code === 'PLATFORM_BUSY')) throw e;
+      await sleep(this.retryDelayMs);
+      return this.postOnce(path, options);
+    }
+  }
+
+  retryDelayMs = 1500;
+
+  private async postOnce(path: string, { query, form = {}, allowNull = false }: { query?: Record<string, unknown>; form?: Record<string, string>; allowNull?: boolean } = {}): Promise<Raw | null> {
     if (!path.startsWith('/') || path.includes('..')) throw new ToolError('INVALID_PATH', '只允许教务系统接口路径。');
     let response;
     try {
@@ -69,6 +82,7 @@ export class ZdbkClient extends SessionClient implements ZdbkApi {
     // 正方 returns non-standard 901/902 when the session has expired.
     if (status === 401 || status === 901 || status === 902) throw new ToolError('LOGIN_REQUIRED', '教务系统会话已失效。');
     if (status === 403) throw new ToolError('FORBIDDEN', '教务系统拒绝访问该功能。');
+    if (status >= 900) throw new ToolError('PLATFORM_BUSY', `教务系统暂时拒绝请求（HTTP ${status}），通常是短时间内重复查询所致。请稍后再试，不要连续重复调用。`, { http_status: status, endpoint: path });
     if (status === 429) throw new ToolError('RATE_LIMITED', '教务系统请求过于频繁，请稍后再试。');
     if (!response.ok) throw new ToolError('PLATFORM_ERROR', `教务系统返回 HTTP ${status}。`, { http_status: status, endpoint: path });
     const body = response.text().trim();
