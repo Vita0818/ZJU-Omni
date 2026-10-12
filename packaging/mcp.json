@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "zju-omni": {
+      "command": "node",
+      "args": ["/ABSOLUTE/PATH/TO/ZJU-mcp/dist/server.js"],
+      "env": {
+        "MCP_TOOL_PROFILE": "full",
+        "ZJU_PLATFORMS": "xzzd,zdbk,zhiyun,pta,cc98",
+        "ZJU_NETWORK": "auto"
+      }
+    },
+    "zju-omni-lite": {
+      "command": "node",
+      "args": ["/ABSOLUTE/PATH/TO/ZJU-mcp/dist/server.js"],
+      "env": {
+        "MCP_TOOL_PROFILE": "lite"
+      }
+    }
+  }
+}

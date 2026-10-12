@@ -1,0 +1,38 @@
+{
+  "name": "zju-omni",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "ZJU-Omni: one MCP server for Zhejiang University campus platforms (学在浙大, 教务, 智云课堂, 拼题A, CC98, 学习通).",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "bin": {
+    "zju-omni": "dist/server.js",
+    "zju-omni-cli": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.tests.json",
+    "start": "node dist/server.js",
+    "cli": "node dist/cli.js",
+    "configure": "node dist/cli.js configure",
+    "login": "node dist/cli.js login",
+    "status": "node dist/cli.js status",
+    "test": "node --test --test-concurrency=4 \"tests/**/*.test.ts\"",
+    "smoke": "node tests/smoke/readonly.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "zod": "4.6.6"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "typescript": "7.0.2"
+  },
+  "author": {
+    "name": "Vita0818",
+    "url": "https://github.com/Vita0818"
+  },
+  "license": "MIT"
+}
