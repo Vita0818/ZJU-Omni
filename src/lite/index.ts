@@ -6,6 +6,8 @@ import type { XzzdServices } from '../platforms/xzzd/index.ts';
 import type { ZdbkServices } from '../platforms/zdbk/index.ts';
 import type { ZhiyunServices } from '../platforms/zhiyun/index.ts';
 import type { PtaServices } from '../platforms/pta/index.ts';
+import type { Cc98Services } from '../platforms/cc98/index.ts';
+import { searchShape as cc98SearchShape, topicShape as cc98TopicShape } from '../platforms/cc98/tools.ts';
 import { problemShape } from '../platforms/pta/tools.ts';
 import { courseLecturesShape, myLecturesShape, transcriptShape } from '../platforms/zhiyun/tools.ts';
 import { courseCodeOfKey, TERMS } from '../platforms/zdbk/parse.ts';
@@ -339,10 +341,40 @@ function ptaLite({ reader }: PtaServices): LiteTool[] {
   ];
 }
 
+function cc98Lite({ reader }: Cc98Services): LiteTool[] {
+  return [
+    {
+      name: 'cc98_search',
+      title: 'CC98搜帖',
+      description: '按关键词搜索 CC98 帖子标题，返回 topic_id。',
+      input: { keyword: z.string(), from: num.optional() },
+      strict: cc98SearchShape,
+      defaults: { size: 15 },
+      run: async args => {
+        const r = await reader.search(args);
+        return { topics: r.topics.map(t => ({ topic_id: t.id, title: t.title, board: t.board, replies: t.replies, time: t.time })), next_from: r.next_from };
+      },
+    },
+    {
+      name: 'cc98_topic',
+      title: 'CC98读帖',
+      description: '读取 CC98 帖子楼层内容。from 翻页。',
+      input: { topic_id: num, from: num.optional() },
+      strict: cc98TopicShape,
+      defaults: { size: 10, max_characters: 1500 },
+      run: async args => {
+        const r = await reader.topic(args);
+        return { title: r.title, board: r.board, floors: r.total_floors, posts: r.posts.map(p => ({ floor: p.floor, author: p.author, text: p.text })), next_from: r.next_from };
+      },
+    },
+  ];
+}
+
 export function liteTools(runtime: Runtime): LiteTool[] {
   const tools: LiteTool[] = [];
   if (runtime.xzzd) tools.push(...xzzdLite(runtime.xzzd, runtime.zdbk, runtime.pta));
   if (runtime.pta) tools.push(...ptaLite(runtime.pta));
+  if (runtime.cc98) tools.push(...cc98Lite(runtime.cc98));
   if (runtime.zdbk) tools.push(...zdbkLite(runtime.zdbk));
   if (runtime.zhiyun) tools.push(...zhiyunLite(runtime.zhiyun));
   return tools;

@@ -28,6 +28,8 @@ export async function authStatus(runtime: Runtime, { platform, check = false }: 
     if (id === 'pta' && runtime.pta) {
       row.cookie = await runtime.pta.client.status();
       if (check) row.live = await runtime.pta.client.check();
+    } else if (id === 'cc98' && runtime.cc98) {
+      if (check) row.live = await runtime.cc98.client.check();
     } else if (check && client) row.live = await client.check();
     platforms.push(row);
   }
@@ -45,9 +47,14 @@ export async function authStatus(runtime: Runtime, { platform, check = false }: 
 export async function authLogin(runtime: Runtime, platform: PlatformId) {
   if (!runtime.ctx.cfg.platforms.has(platform)) throw new ToolError('PLATFORM_DISABLED', `${PLATFORM_LABELS[platform]} 未启用。请在 ZJU_PLATFORMS 中加入 ${platform}。`);
   if (platform === 'pta') throw new ToolError('COOKIE_IMPORT_REQUIRED', '拼题A 登录需要短信验证，不做自动登录。请在浏览器登录 pintia.cn 后，在本机终端运行导入命令。', { setup_command: PTA_SETUP });
+  if (platform === 'cc98' && runtime.cc98) {
+    await runtime.cc98.client.login({ explicit: true });
+    const me = await runtime.cc98.client.me();
+    return { platform, authenticated: true, name: me?.name ?? null, message: '已登录 CC98。' };
+  }
   const client = runtime.clients.get(platform);
   if (!client) throw new ToolError('PLATFORM_NOT_IMPLEMENTED', `${PLATFORM_LABELS[platform]} 尚未实现登录。`);
-  const session = await client.refreshSession();
+  const session = await client.refreshSession({ explicit: true });
   return { platform, authenticated: true, mode: session.mode, saved_at: session.stored.saved_at, message: `已连接${PLATFORM_LABELS[platform]}（${session.mode === 'webvpn' ? '经 WebVPN' : '直连'}）。` };
 }
 

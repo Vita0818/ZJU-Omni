@@ -18,7 +18,7 @@ await client.connect(clientSide);
 
 const WRITE = /prepare|submit|save|retract|forget|download|sync/;
 const platformOf = (name: string) => (name.startsWith('zju_auth') ? 'zju' : name.split('_')[0]);
-const LITE_PLATFORM: Record<string, string> = { pta_problem: 'pta', zju_schedule: 'zdbk', zju_exams: 'zdbk', zju_grades: 'zdbk', zju_lectures: 'zhiyun', zju_transcript: 'zhiyun' };
+const LITE_PLATFORM: Record<string, string> = { pta_problem: 'pta', cc98_search: 'cc98', cc98_topic: 'cc98', zju_schedule: 'zdbk', zju_exams: 'zdbk', zju_grades: 'zdbk', zju_lectures: 'zhiyun', zju_transcript: 'zhiyun' };
 const wanted = (name: string) => {
   const platform = lite ? LITE_PLATFORM[name] ?? 'xzzd' : platformOf(name);
   if (platform !== 'zju' && !cfg.platforms.has(platform as any)) return false;
@@ -121,6 +121,20 @@ if (runtime.pta && cfg.platforms.has('pta') && (!only || only.includes('pta'))) 
       const problem = list?.problems?.[0];
       if (problem) await step('pta_get_problem', { problem_set_id: first.id, problem_id: problem.id, max_characters: 500 });
     }
+  }
+}
+if (runtime.cc98 && cfg.platforms.has('cc98') && (!only || only.includes('cc98'))) {
+  if (!(await runtime.cc98.ctx.accounts.status('cc98')).configured) process.stdout.write('  (CC98 账号未配置，跳过 CC98；npm run configure -- cc98)\n');
+  else if (lite) {
+    const found = await step('cc98_search', { keyword: '选课' });
+    const topic = found?.topics?.[0];
+    if (topic) await step('cc98_topic', { topic_id: topic.topic_id });
+  } else {
+    await step('cc98_hot_topics', {});
+    const found = await step('cc98_search', { keyword: '选课', size: 5 });
+    const topic = found?.topics?.[0];
+    if (topic) await step('cc98_get_topic', { topic_id: topic.id, size: 5 });
+    await step('cc98_notifications', { size: 5 });
   }
 }
 await client.close();

@@ -95,6 +95,25 @@ test('CAS rejection does not retry the password or save an authenticated session
   await assert.rejects(() => readFile(ctx.sessions.path('xzzd')), (e: any) => e.code === 'ENOENT');
 });
 
+test('a rejected CAS password is not resubmitted automatically, but an explicit login may retry', async t => {
+  let posts = 0;
+  const fetchImpl = mockFetch((url, init) => {
+    if (url.pathname.includes('getPubKey')) return respond(200, { modulus, exponent });
+    if (url.hostname === 'courses.zju.edu.cn') return respond(302, '', { location: 'https://zjuam.zju.edu.cn/cas/login' });
+    if (init.method === 'POST') {
+      posts++;
+      return respond(200, '<p>用户名或密码错误</p>');
+    }
+    return respond(200, '<form id="fm1"><input name="execution" value="opaque"></form>');
+  });
+  const { ctx } = await testContext(t, { env: { ...CREDS, ZJU_NETWORK: 'direct' }, fetchImpl });
+  await assert.rejects(() => new XzzdClient(ctx).refreshSession(), (e: any) => e.code === 'AUTHENTICATION_REQUIRED');
+  await assert.rejects(() => new XzzdClient(ctx).refreshSession(), (e: any) => /不再自动重试/.test(e.message));
+  assert.equal(posts, 1);
+  await assert.rejects(() => new XzzdClient(ctx).refreshSession({ explicit: true }), (e: any) => e.code === 'AUTHENTICATION_REQUIRED');
+  assert.equal(posts, 2);
+});
+
 test('captcha challenges stop with a distinct code', async t => {
   const fetchImpl = mockFetch((url, init) => {
     if (url.pathname.includes('getPubKey')) return respond(200, { modulus, exponent });

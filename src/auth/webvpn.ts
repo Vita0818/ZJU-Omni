@@ -93,13 +93,18 @@ export async function loginWebvpn(http: HttpClient, credentials: { username: str
     throw new ToolError('AUTH_FLOW_CHANGED', 'WebVPN 登录接口返回格式无法识别。', { http_status: response.status });
   }
   if (result.success === true) return;
-  if (result.error === 'NEED_CONFIRM') {
-    throw new ToolError('WEBVPN_CONFIRM_REQUIRED', 'WebVPN 提示该账号已在其他设备登录，需要确认后才能继续。为避免踢下其他会话，已停止；请先在其他设备退出 WebVPN 后重试。');
+  const code = typeof result.error === 'string' ? result.error : 'UNKNOWN';
+  const details = { platform_error: code };
+  if (code === 'NEED_CONFIRM') {
+    throw new ToolError('WEBVPN_CONFIRM_REQUIRED', 'WebVPN 提示该账号已在其他设备登录，需要确认后才能继续。为避免踢下其他会话，已停止；请先在其他设备退出 WebVPN 后重试。', details);
   }
-  if (result.error === 'CAPTCHA_FAILED' || result.error === 'NEED_CAPTCHA') {
-    throw new ToolError('AUTH_CHALLENGE_REQUIRED', 'WebVPN 要求验证码。请先在浏览器登录一次 webvpn.zju.edu.cn，再重试；不会自动重试。');
+  if (code === 'CAPTCHA_FAILED' || code === 'NEED_CAPTCHA' || code.startsWith('NEED_TWO_STEP') || code === 'WECHAT_BINDING') {
+    throw new ToolError('AUTH_CHALLENGE_REQUIRED', 'WebVPN 要求验证码、短信或二次验证。请先在浏览器登录一次 webvpn.zju.edu.cn，再重试；不会自动重试。', details);
   }
-  throw new ToolError('AUTHENTICATION_REQUIRED', 'WebVPN 未接受本次登录，请检查统一认证账号配置。不会自动重试。');
+  if (code === 'TOO_MANY_ATTEMPTS' || code === 'IP_FORBIDDEN' || code === 'WEEK_PASSWORD_FORBID') {
+    throw new ToolError('AUTH_BLOCKED', code === 'WEEK_PASSWORD_FORBID' ? 'WebVPN 以弱密码为由拒绝登录，请先在浏览器修改密码。' : 'WebVPN 暂时阻止了登录（尝试过多或 IP 受限），请稍后在浏览器登录确认。', details);
+  }
+  throw new ToolError('AUTHENTICATION_REQUIRED', 'WebVPN 未接受本次登录。WebVPN 使用“上网账号”，其密码可能与统一认证不同；如是，请运行 npm run configure -- webvpn 单独配置。不会自动重试。', details);
 }
 
 export async function isCampusNetwork(fetchImpl: typeof fetch = fetch): Promise<boolean | null> {

@@ -4,6 +4,7 @@ import { readFile, stat, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createCipheriv } from 'node:crypto';
 import { loadConfig, enabledPlatforms, networkMode, toolProfile } from '../src/core/config.ts';
+import { createContext } from '../src/core/context.ts';
 import { CookieJar, parseSetCookie } from '../src/core/cookies.ts';
 import { HttpClient } from '../src/core/http.ts';
 import { RateLimiter } from '../src/core/ratelimit.ts';
@@ -143,6 +144,23 @@ test('WebVPN host encryption matches the padded reference algorithm and round-tr
   assert.throws(() => webvpnTransport.toLogical(new URL('https://webvpn.zju.edu.cn/login?cas_login=true')), (e: any) => e.code === 'WEBVPN_LOGIN_REQUIRED');
   assert.ok(webvpnPassword('pw').startsWith(Buffer.from('wrdvpnisawesome!').toString('hex')));
   assert.equal(webvpnPassword('pw').length, 32 + 4);
+});
+
+test('a rejected WebVPN login is not resubmitted by later automatic calls', async t => {
+  const dir = await tempDir(t);
+  let posts = 0;
+  const fetchImpl = mockFetch(url => {
+    if (url.pathname === '/login') return respond(200, '<input name="_csrf" value="c">');
+    posts++;
+    return respond(200, { success: false, error: 'INVALID_ACCOUNT', message: 'x' });
+  });
+  const env = { ZJU_OMNI_DATA_DIR: dir, ZJU_OMNI_LEGACY_DIR: '', ZJU_MIN_INTERVAL_MS: '0', ZJU_USERNAME: 'u', ZJU_PASSWORD: 'p' };
+  const ctx = createContext(loadConfig(env), { env, fetchImpl });
+  await assert.rejects(() => ctx.network.loginWebvpn(), (e: any) => e.code === 'AUTHENTICATION_REQUIRED' && e.details.platform_error === 'INVALID_ACCOUNT');
+  await assert.rejects(() => ctx.network.loginWebvpn(), (e: any) => /不再自动重试/.test(e.message));
+  assert.equal(posts, 1);
+  await assert.rejects(() => ctx.network.loginWebvpn({ explicit: true }));
+  assert.equal(posts, 2);
 });
 
 test('WebVPN login submits once, stores the ticket and stops on captcha or confirmation prompts', async () => {

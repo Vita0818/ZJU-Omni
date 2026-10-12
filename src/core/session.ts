@@ -104,24 +104,33 @@ export abstract class SessionClient {
     return this.storage.run(session, fn);
   }
 
-  async refreshSession(): Promise<ActiveSession> {
+  async refreshSession({ explicit = false }: { explicit?: boolean } = {}): Promise<ActiveSession> {
     if (!this.refreshing) {
-      this.refreshing = this.authenticate().finally(() => {
+      this.refreshing = this.authenticate(explicit).finally(() => {
         this.refreshing = null;
       });
     }
     return this.refreshing;
   }
 
-  private async authenticate(): Promise<ActiveSession> {
+  private async authenticate(explicit = false): Promise<ActiveSession> {
     if (this.authenticateOverride) {
       const result = await this.authenticateOverride();
       return 'jar' in result ? result : this.activate(result);
     }
+    const failureKey = `cas:${this.accountKind}`;
+    if (!explicit) this.ctx.network.assertNoRecentFailure(failureKey);
     if (!(await this.ctx.accounts.status(this.accountKind)).configured) await this.ctx.accounts.load(this.accountKind);
     this.ctx.network.forgetReachability();
-    const mode = await this.ctx.network.chooseMode(this.probeHost);
-    return mode === 'webvpn' ? this.authenticateWebvpn() : this.authenticateDirect();
+    try {
+      const mode = await this.ctx.network.chooseMode(this.probeHost);
+      const session = mode === 'webvpn' ? await this.authenticateWebvpn(explicit) : await this.authenticateDirect();
+      this.ctx.network.clearFailure(failureKey);
+      return session;
+    } catch (e) {
+      if (!(e instanceof ToolError && e.details.platform_error !== undefined)) this.ctx.network.rememberFailure(failureKey, e);
+      throw e;
+    }
   }
 
   private async authenticateDirect(): Promise<ActiveSession> {
@@ -137,9 +146,9 @@ export abstract class SessionClient {
     return active;
   }
 
-  private async authenticateWebvpn(): Promise<ActiveSession> {
+  private async authenticateWebvpn(explicit: boolean): Promise<ActiveSession> {
     for (let attempt = 0; attempt < 2; attempt++) {
-      const jar = attempt === 0 ? await this.ctx.network.webvpnJar() : await this.ctx.network.loginWebvpn();
+      const jar = attempt === 0 ? await this.ctx.network.webvpnJar() : await this.ctx.network.loginWebvpn({ explicit });
       const http = this.ctx.network.client('webvpn', jar, this.platform);
       try {
         await this.login(http);

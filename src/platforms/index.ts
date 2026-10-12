@@ -6,6 +6,8 @@ import { createXzzd, type XzzdServices } from './xzzd/index.ts';
 import { xzzdTools } from './xzzd/tools.ts';
 import { createZdbk, type ZdbkServices } from './zdbk/index.ts';
 import { zdbkTools } from './zdbk/tools.ts';
+import { createCc98, type Cc98Services } from './cc98/index.ts';
+import { cc98Tools } from './cc98/tools.ts';
 import { createPta, type PtaServices } from './pta/index.ts';
 import { ptaTools } from './pta/tools.ts';
 import { createZhiyun, type ZhiyunServices } from './zhiyun/index.ts';
@@ -20,7 +22,7 @@ export const PLATFORM_LABELS: Record<PlatformId, string> = {
   xxt: '学习通',
 };
 
-export const IMPLEMENTED_PLATFORMS: ReadonlySet<PlatformId> = new Set(['xzzd', 'zdbk', 'zhiyun', 'pta']);
+export const IMPLEMENTED_PLATFORMS: ReadonlySet<PlatformId> = new Set(['xzzd', 'zdbk', 'zhiyun', 'pta', 'cc98']);
 
 export interface Runtime {
   ctx: AppContext;
@@ -28,6 +30,7 @@ export interface Runtime {
   zdbk?: ZdbkServices;
   zhiyun?: ZhiyunServices;
   pta?: PtaServices;
+  cc98?: Cc98Services;
   clients: Map<PlatformId, SessionClient>;
   tools: FullTool[];
 }
@@ -52,6 +55,10 @@ export function createRuntime(ctx: AppContext): Runtime {
   if (ctx.cfg.platforms.has('pta')) {
     runtime.pta = createPta(ctx);
     runtime.tools.push(...ptaTools(runtime.pta));
+  }
+  if (ctx.cfg.platforms.has('cc98')) {
+    runtime.cc98 = createCc98(ctx);
+    runtime.tools.push(...cc98Tools(runtime.cc98));
   }
   return runtime;
 }

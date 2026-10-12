@@ -8,23 +8,26 @@ import { readJson, writePrivate } from './store.ts';
 const exec = promisify(execFile);
 const SECURITY = '/usr/bin/security';
 
-export const ACCOUNT_KINDS = ['zju', 'cc98', 'xxt'] as const;
+export const ACCOUNT_KINDS = ['zju', 'webvpn', 'cc98', 'xxt'] as const;
 export type AccountKind = (typeof ACCOUNT_KINDS)[number];
 
 export const KEYCHAIN_SERVICES: Record<AccountKind, string> = {
   zju: 'zju-omni.zjuam',
+  webvpn: 'zju-omni.webvpn',
   cc98: 'zju-omni.cc98',
   xxt: 'zju-omni.xxt',
 };
 
 const ACCOUNT_LABELS: Record<AccountKind, string> = {
   zju: '浙大统一认证',
+  webvpn: 'WebVPN 上网账号',
   cc98: 'CC98',
   xxt: '学习通',
 };
 
 const ENV_NAMES: Record<AccountKind, [string, string]> = {
   zju: ['ZJU_USERNAME', 'ZJU_PASSWORD'],
+  webvpn: ['WEBVPN_USERNAME', 'WEBVPN_PASSWORD'],
   cc98: ['CC98_USERNAME', 'CC98_PASSWORD'],
   xxt: ['XXT_USERNAME', 'XXT_PASSWORD'],
 };

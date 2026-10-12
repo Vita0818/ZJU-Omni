@@ -35,12 +35,15 @@ export function createContext(cfg: Config, options: ContextOptions = {}): AppCon
 }
 
 export const SSO_HOSTS = new Set([CAS_HOST, IDENTITY_HOST]);
+const FAILURE_CODES = new Set(['AUTHENTICATION_REQUIRED', 'AUTH_CHALLENGE_REQUIRED', 'AUTH_BLOCKED', 'WEBVPN_CONFIRM_REQUIRED', 'AUTH_PASSWORD_ENCODING_UNSUPPORTED']);
+const FAILURE_TTL_MS = 15 * 60000;
 
 export class NetworkManager {
   private ctx: AppContext;
   private sso = new CookieJar();
   private reachable = new Map<string, boolean>();
   private webvpnLoggingIn: Promise<CookieJar> | null = null;
+  private failures = new Map<string, { error: ToolError; at: number }>();
 
   constructor(ctx: AppContext) {
     this.ctx = ctx;
@@ -110,14 +113,38 @@ export class NetworkManager {
     await this.ctx.sessions.write({ platform: 'webvpn', mode: 'direct', saved_at: new Date().toISOString(), cookies: jar.list().filter(c => c.domain === 'webvpn.zju.edu.cn' || c.domain === 'zju.edu.cn') });
   }
 
-  async loginWebvpn(): Promise<CookieJar> {
+  /** Credential rejections are remembered so automatic logins never resubmit a bad password. */
+  rememberFailure(key: string, error: unknown): void {
+    if (error instanceof ToolError && FAILURE_CODES.has(error.code)) this.failures.set(key, { error, at: Date.now() });
+  }
+
+  clearFailure(key?: string): void {
+    if (key) this.failures.delete(key);
+    else this.failures.clear();
+  }
+
+  assertNoRecentFailure(key: string): void {
+    const failure = this.failures.get(key);
+    if (failure && Date.now() - failure.at < FAILURE_TTL_MS) {
+      throw new ToolError(failure.error.code, `${failure.error.message}（本进程 ${Math.round(FAILURE_TTL_MS / 60000)} 分钟内不再自动重试；修正配置后用 zju_auth_login 显式登录。）`, failure.error.details);
+    }
+  }
+
+  async loginWebvpn({ explicit = false }: { explicit?: boolean } = {}): Promise<CookieJar> {
+    if (!explicit) this.assertNoRecentFailure('webvpn');
     if (!this.webvpnLoggingIn) {
       this.webvpnLoggingIn = (async () => {
-        const configured = await this.ctx.accounts.status('zju');
-        if (!configured.configured) await this.ctx.accounts.load('zju');
+        const kind = (await this.ctx.accounts.status('webvpn')).configured ? 'webvpn' : 'zju';
+        if (!(await this.ctx.accounts.status(kind)).configured) await this.ctx.accounts.load(kind);
         const jar = new CookieJar();
         const http = this.client('direct', jar, 'webvpn');
-        await loginWebvpn(http, await this.ctx.accounts.load('zju'));
+        try {
+          await loginWebvpn(http, await this.ctx.accounts.load(kind));
+        } catch (e) {
+          this.rememberFailure('webvpn', e);
+          throw e;
+        }
+        this.clearFailure('webvpn');
         if (!jar.matching(new URL(WEBVPN_ORIGIN)).length) throw new ToolError('WEBVPN_SESSION_MISSING', 'WebVPN 登录成功但未返回会话。');
         await this.saveWebvpnJar(jar);
         return jar;
