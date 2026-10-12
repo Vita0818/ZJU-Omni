@@ -18,9 +18,9 @@
 | 5 | lite 补全（课程学分）、技能文档、Codex / Claude Code / DSH / 通用客户端包装、本地模型固定题实测 | 完成（ornith-1.5-9b 10/10，见 [docs/lite-eval.md](docs/lite-eval.md)） |
 | 6 | 拼题A：我的题集与截止、题集详情与进度、题目列表、题面（只读，4 个 `pta_*`；浏览器 Cookie 导入） | 完成（公开题集已真机验证；个人题集待导入 Cookie） |
 | 7 | CC98：搜帖、读帖、十大、版面、用户、通知、私信（读）；回帖、发帖、私信（两步确认写，16 个 `cc98_*`） | 完成（待配置 CC98 账号后真机冒烟；校外需 WebVPN） |
-| 8 | 学习通（可选） | 未开始 |
+| 8 | 学习通（可选，默认不加载）：课程、作业与截止、考试、通知、课表（只读，6 个 `xxt_*`；浏览器 Cookie 导入）；启用后 `zju_deadlines` 并入学习通作业 | 完成（待导入 Cookie 后真机冒烟）；课件同步、资料区、云盘暂未移植 |
 
-full 档目前 54 个工具。lite 档 16 个（工具目录 4,595 字符）：`zju_deadlines`、`zju_courses`、`zju_assignment`、`zju_materials`、`zju_sync`、`zju_search`、`zju_prepare_submission`、`zju_submit`（学在浙大），`zju_schedule`、`zju_exams`、`zju_grades`（教务），`zju_lectures`、`zju_transcript`（智云），`pta_problem`（拼题A；`zju_deadlines` 同时列出拼题A 题集截止），`cc98_search`、`cc98_topic`（CC98）。
+full 档目前 54 个工具（启用学习通后 60 个）。lite 档 16 个（工具目录 4,595 字符）：`zju_deadlines`、`zju_courses`、`zju_assignment`、`zju_materials`、`zju_sync`、`zju_search`、`zju_prepare_submission`、`zju_submit`（学在浙大），`zju_schedule`、`zju_exams`、`zju_grades`（教务），`zju_lectures`、`zju_transcript`（智云），`pta_problem`（拼题A；`zju_deadlines` 同时列出拼题A 题集截止），`cc98_search`、`cc98_topic`（CC98）。
 
 ## 安装
 
@@ -33,6 +33,7 @@ npm run configure -- zju   # 在自己的终端运行：账号输入一次，密
 npm run login              # 可选：立即验证登录
 pbpaste | npm run cli -- pta-cookie   # 拼题A：浏览器登录后复制任一 /api 请求的 cURL 或 Cookie，再运行
 npm run configure -- cc98             # CC98 论坛账号（可选）
+pbpaste | npm run cli -- xxt-cookie   # 学习通（需 ZJU_PLATFORMS 含 xxt）：浏览器登录后复制 cURL 或 Cookie
 npm run configure -- webvpn           # 可选：WebVPN 上网账号密码与统一认证不同时单独配置
 ```
 
@@ -61,6 +62,7 @@ npm run configure -- webvpn           # 可选：WebVPN 上网账号密码与统
 | `ZJU_OMNI_DATA_DIR` | 会话、预览计划等本地状态目录 | `~/.local/share/zju-omni` |
 | `ZJU_USERNAME` / `ZJU_PASSWORD` | 不用钥匙串时的替代（需自行保护启动环境） | — |
 | `WEBVPN_USERNAME` / `WEBVPN_PASSWORD`、`CC98_USERNAME` / `CC98_PASSWORD` | 对应账号的环境变量替代 | — |
+| `CHAOXING_COOKIE` | 学习通 Cookie 的替代来源 | — |
 | `PINTIA_COOKIE` | 拼题A Cookie 的替代来源（优先于导入的会话） | — |
 | `ZJU_XZZD_STORAGE_HOSTS` | 学在浙大文件存储的额外允许域名 | — |
 
@@ -95,15 +97,15 @@ npm run eval:lite -- --model=ornith-1.5-9b     # 本地模型固定题实测（�
 src/
   core/        配置、错误、Cookie、HTTP（直连/WebVPN 传输）、限速、钥匙串、会话存储、会话生命周期、工具注册
   auth/        统一认证 CAS、WebVPN、跨平台 zju_auth_* 工具
-  platforms/   xzzd/（client、reads、actions、workflows、sync、tools）、zdbk/（client、parse、reads、tools）、zhiyun/（client、reads、tools）、pta/（client、cookie、reads、tools）、cc98/（client、ubb、reads、actions、tools）
+  platforms/   xzzd/（client、reads、actions、workflows、sync、tools）、zdbk/（client、parse、reads、tools）、zhiyun/（client、reads、tools）、pta/（client、cookie、reads、tools）、cc98/（client、ubb、reads、actions、tools）、xxt/（client、reads、tools）
   lite/        小模型版任务型工具
   app.ts       组装服务；server.ts stdio 入口；cli.ts 命令行
 skills/        zju/（正常版）、zju-lite/（小模型版，≤1.5 KB）
 packaging/     codex/、claude/、dsh/ 包装模板，mcp.json 通用示例；scripts/package.ts 生成 build/
-docs/          xzzd/、zdbk/、zhiyun/、pta/、cc98/ 接口适配记录
+docs/          xzzd/、zdbk/、zhiyun/、pta/、cc98/、xxt/ 接口适配记录
 tests/         node:test 单元与协议测试、smoke/ 真机只读脚本、lite-eval/ 本地模型固定题
 ```
 
 ## 致谢与许可
 
-MIT。CC98 登录与接口参考 cc98-mcp（MIT）与本地 cc98-desktop。拼题A 接口路径与 [jinzcdev/vscode-pintia](https://github.com/jinzcdev/vscode-pintia)（MIT）核对。智云课堂接口用法参考 [8eoyw/zju-learning-cli](https://github.com/8eoyw/zju-learning-cli)（MIT）。WebVPN URL 加密与登录表单参考 [EviterLesRoses2/cc98-mcp](https://github.com/EviterLesRoses2/cc98-mcp)（MIT，其上游为 Lucent-Snow/CC98-CLI，MIT）。
+MIT。学习通部分移植自 zju-chaoxing（MIT，上游 © Wu Jiale）。CC98 登录与接口参考 cc98-mcp（MIT）与本地 cc98-desktop。拼题A 接口路径与 [jinzcdev/vscode-pintia](https://github.com/jinzcdev/vscode-pintia)（MIT）核对。智云课堂接口用法参考 [8eoyw/zju-learning-cli](https://github.com/8eoyw/zju-learning-cli)（MIT）。WebVPN URL 加密与登录表单参考 [EviterLesRoses2/cc98-mcp](https://github.com/EviterLesRoses2/cc98-mcp)（MIT，其上游为 Lucent-Snow/CC98-CLI，MIT）。

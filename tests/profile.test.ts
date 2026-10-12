@@ -50,9 +50,10 @@ test('platform switches remove disabled tools', async t => {
   const { tools } = await client.listTools();
   assert.ok(tools.every(tool => !tool.name.startsWith('xzzd_')));
   assert.ok(tools.some(tool => tool.name === 'zdbk_get_timetable'));
+  assert.ok(tools.some(tool => tool.name === 'xxt_list_courses'));
   assert.ok(tools.some(tool => tool.name === 'zju_auth_status'));
   const status: any = await client.callTool({ name: 'zju_auth_status', arguments: {} });
-  assert.deepEqual(status.structuredContent.data.platforms.map((p: any) => [p.platform, p.implemented]), [['zdbk', true], ['xxt', false]]);
+  assert.deepEqual(status.structuredContent.data.platforms.map((p: any) => [p.platform, p.implemented]), [['zdbk', true], ['xxt', true]]);
   const login: any = await client.callTool({ name: 'zju_auth_login', arguments: { platform: 'xzzd' } });
   assert.equal(login.structuredContent.error.code, 'PLATFORM_DISABLED');
 });

@@ -6,6 +6,7 @@ import type { XzzdServices } from '../platforms/xzzd/index.ts';
 import type { ZdbkServices } from '../platforms/zdbk/index.ts';
 import type { ZhiyunServices } from '../platforms/zhiyun/index.ts';
 import type { PtaServices } from '../platforms/pta/index.ts';
+import type { XxtServices } from '../platforms/xxt/index.ts';
 import type { Cc98Services } from '../platforms/cc98/index.ts';
 import { searchShape as cc98SearchShape, topicShape as cc98TopicShape } from '../platforms/cc98/tools.ts';
 import { problemShape } from '../platforms/pta/tools.ts';
@@ -47,7 +48,17 @@ async function ptaDeadlines(pta: PtaServices) {
   }
 }
 
-function xzzdLite(x: XzzdServices, zdbk?: ZdbkServices, pta?: PtaServices): LiteTool[] {
+async function xxtDeadlines(xxt: XxtServices) {
+  if (!(await xxt.client.status()).configured) return { xxt_note: '学习通未导入 Cookie，未包含学习通作业' };
+  try {
+    const r = await xxt.reader.deadlines({ horizon_days: 60, max_courses: 15 });
+    return { xxt: r.items.map(i => ({ course: i.course, title: i.title, due: i.deadline?.replace('T', ' ').slice(0, 16) ?? null, status: i.status })) };
+  } catch (e: any) {
+    return { xxt_error: e?.code ?? 'INTERNAL_ERROR' };
+  }
+}
+
+function xzzdLite(x: XzzdServices, zdbk?: ZdbkServices, pta?: PtaServices, xxt?: XxtServices): LiteTool[] {
   const { client, reader, workflows, materials, actions } = x;
   const read = <T>(fn: () => Promise<T>) => client.withSession(fn, { readOnly: true });
   const write = <T>(fn: () => Promise<T>) => client.withSession(fn, { readOnly: false });
@@ -69,6 +80,7 @@ function xzzdLite(x: XzzdServices, zdbk?: ZdbkServices, pta?: PtaServices): Lite
             complete: r.complete,
             error_codes: errorCodes(r.errors),
             ...(pta && !args.offset ? await ptaDeadlines(pta) : {}),
+            ...(xxt && !args.offset ? await xxtDeadlines(xxt) : {}),
           };
         }),
     },
@@ -372,7 +384,7 @@ function cc98Lite({ reader }: Cc98Services): LiteTool[] {
 
 export function liteTools(runtime: Runtime): LiteTool[] {
   const tools: LiteTool[] = [];
-  if (runtime.xzzd) tools.push(...xzzdLite(runtime.xzzd, runtime.zdbk, runtime.pta));
+  if (runtime.xzzd) tools.push(...xzzdLite(runtime.xzzd, runtime.zdbk, runtime.pta, runtime.xxt));
   if (runtime.pta) tools.push(...ptaLite(runtime.pta));
   if (runtime.cc98) tools.push(...cc98Lite(runtime.cc98));
   if (runtime.zdbk) tools.push(...zdbkLite(runtime.zdbk));

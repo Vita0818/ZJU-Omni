@@ -9,6 +9,8 @@ import { zdbkTools } from './zdbk/tools.ts';
 import { createCc98, type Cc98Services } from './cc98/index.ts';
 import { cc98Tools } from './cc98/tools.ts';
 import { createPta, type PtaServices } from './pta/index.ts';
+import { createXxt, type XxtServices } from './xxt/index.ts';
+import { xxtTools } from './xxt/tools.ts';
 import { ptaTools } from './pta/tools.ts';
 import { createZhiyun, type ZhiyunServices } from './zhiyun/index.ts';
 import { zhiyunTools } from './zhiyun/tools.ts';
@@ -22,7 +24,7 @@ export const PLATFORM_LABELS: Record<PlatformId, string> = {
   xxt: '学习通',
 };
 
-export const IMPLEMENTED_PLATFORMS: ReadonlySet<PlatformId> = new Set(['xzzd', 'zdbk', 'zhiyun', 'pta', 'cc98']);
+export const IMPLEMENTED_PLATFORMS: ReadonlySet<PlatformId> = new Set(['xzzd', 'zdbk', 'zhiyun', 'pta', 'cc98', 'xxt']);
 
 export interface Runtime {
   ctx: AppContext;
@@ -31,6 +33,7 @@ export interface Runtime {
   zhiyun?: ZhiyunServices;
   pta?: PtaServices;
   cc98?: Cc98Services;
+  xxt?: XxtServices;
   clients: Map<PlatformId, SessionClient>;
   tools: FullTool[];
 }
@@ -59,6 +62,10 @@ export function createRuntime(ctx: AppContext): Runtime {
   if (ctx.cfg.platforms.has('cc98')) {
     runtime.cc98 = createCc98(ctx);
     runtime.tools.push(...cc98Tools(runtime.cc98));
+  }
+  if (ctx.cfg.platforms.has('xxt')) {
+    runtime.xxt = createXxt(ctx);
+    runtime.tools.push(...xxtTools(runtime.xxt));
   }
   return runtime;
 }

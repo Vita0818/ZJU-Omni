@@ -11,6 +11,7 @@ import { ACCOUNT_KINDS, accountLabel, storePasswordInteractively, type AccountKi
 import { catalogSize } from './core/tools.ts';
 import { createRuntime } from './platforms/index.ts';
 import { PtaClient } from './platforms/pta/client.ts';
+import { XxtClient } from './platforms/xxt/client.ts';
 
 const USAGE = `用法: zju-omni-cli <命令>
 
@@ -19,6 +20,7 @@ const USAGE = `用法: zju-omni-cli <命令>
   status [--check]               查看凭据、会话；--check 对已有会话做只读验证
   forget [平台] [--credentials]  删除会话；--credentials 同时删除钥匙串账号
   pta-cookie                     从标准输入导入拼题A Cookie（如 pbpaste | … pta-cookie）
+  xxt-cookie                     从标准输入导入学习通 Cookie
   tools [full|lite]              输出工具目录与体积
 
 平台: ${ALL_PLATFORMS.join(', ')}`;
@@ -84,6 +86,15 @@ async function main() {
     }
     case 'tools':
       return catalog(args[0]);
+    case 'xxt-cookie': {
+      if (process.stdin.isTTY) throw new Error('请通过管道传入，例如：pbpaste | npm run cli -- xxt-cookie');
+      const chunks: Buffer[] = [];
+      for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
+      const xxt = new XxtClient(createContext(loadConfig()));
+      const saved = await xxt.importCookie(Buffer.concat(chunks).toString('utf8'));
+      const check = await xxt.checkLogin().catch(e => ({ authenticated: false, reason: safeError(e).code }));
+      return print({ imported_from: saved.source, cookie_names: saved.cookie_names, missing_required: saved.missing_required, ...check });
+    }
     case 'pta-cookie': {
       if (process.stdin.isTTY) throw new Error('请通过管道传入，例如：pbpaste | npm run cli -- pta-cookie');
       const chunks: Buffer[] = [];

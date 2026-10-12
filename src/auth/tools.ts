@@ -4,6 +4,7 @@ import { ToolError } from '../core/errors.ts';
 import { ACCOUNT_KINDS } from '../core/keychain.ts';
 import type { FullTool } from '../core/tools.ts';
 import { PTA_SETUP } from '../platforms/pta/client.ts';
+import { XXT_SETUP } from '../platforms/xxt/client.ts';
 import { IMPLEMENTED_PLATFORMS, PLATFORM_LABELS, type Runtime } from '../platforms/index.ts';
 
 const platformEnum = z.enum(ALL_PLATFORMS);
@@ -28,6 +29,9 @@ export async function authStatus(runtime: Runtime, { platform, check = false }: 
     if (id === 'pta' && runtime.pta) {
       row.cookie = await runtime.pta.client.status();
       if (check) row.live = await runtime.pta.client.check();
+    } else if (id === 'xxt' && runtime.xxt) {
+      row.cookie = await runtime.xxt.client.status();
+      if (check) row.live = await runtime.xxt.client.checkLogin();
     } else if (id === 'cc98' && runtime.cc98) {
       if (check) row.live = await runtime.cc98.client.check();
     } else if (check && client) row.live = await client.check();
@@ -46,6 +50,7 @@ export async function authStatus(runtime: Runtime, { platform, check = false }: 
 
 export async function authLogin(runtime: Runtime, platform: PlatformId) {
   if (!runtime.ctx.cfg.platforms.has(platform)) throw new ToolError('PLATFORM_DISABLED', `${PLATFORM_LABELS[platform]} 未启用。请在 ZJU_PLATFORMS 中加入 ${platform}。`);
+  if (platform === 'xxt') throw new ToolError('COOKIE_IMPORT_REQUIRED', '学习通登录常弹滑块验证码，不做自动登录。请在浏览器登录学习通后，在本机终端运行导入命令。', { setup_command: XXT_SETUP });
   if (platform === 'pta') throw new ToolError('COOKIE_IMPORT_REQUIRED', '拼题A 登录需要短信验证，不做自动登录。请在浏览器登录 pintia.cn 后，在本机终端运行导入命令。', { setup_command: PTA_SETUP });
   if (platform === 'cc98' && runtime.cc98) {
     await runtime.cc98.client.login({ explicit: true });
