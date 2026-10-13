@@ -13,11 +13,14 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const DSH = process.env.DSH_BIN ?? '/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh';
 const arg = (name: string, fallback?: string) => process.argv.find(a => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 const MODEL = arg('model', 'ornith-1.5-9b')!;
+const RUN_NAME = process.argv.includes('--lean') ? `${MODEL}-lean` : MODEL;
 const ONLY = arg('only')?.split(',');
 const VERBOSE = process.argv.includes('--verbose');
 const TIMEOUT_MS = Number(arg('timeout', '420000'));
 const EVAL = join(ROOT, 'build', 'dsh-eval');
 const ZJU_PATCH = join(ROOT, 'build', 'dsh', 'zju-omni.cordis.patch.yml');
+const LEAN = process.argv.includes('--lean');
+const LEAN_PATCH = join(ROOT, 'build', 'dsh', 'zju-assistant.patch.yml');
 // Run outside the repository, as a real user would, so the model cannot browse this source tree.
 const WORK = join(tmpdir(), 'zju-omni-dsh-eval-work');
 
@@ -60,7 +63,7 @@ await writeFile(modelPatch, `- id: llm-pi-ai
 
 function runDsh(prompt: string): Promise<{ events: any[]; stderr: string; timedOut: boolean }> {
   return new Promise(resolve => {
-    const child = spawn(DSH, ['--profile', 'headless', '--patch', ZJU_PATCH, '--patch', modelPatch, '--json', prompt], {
+    const child = spawn(DSH, ['--profile', 'headless', '--patch', ZJU_PATCH, '--patch', modelPatch, ...(LEAN ? ['--patch', LEAN_PATCH] : []), '--json', prompt], {
       cwd: WORK,
       env: { ...process.env, DSH_HOME: join(EVAL, 'home') },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -93,8 +96,8 @@ const rows: any[] = [];
 for (const q of questions.filter(q => !ONLY || ONLY.includes(q.id))) {
   const started = Date.now();
   const { events, stderr, timedOut } = await runDsh(q.prompt);
-  await mkdir(join(EVAL, 'runs', MODEL), { recursive: true });
-  await writeFile(join(EVAL, 'runs', MODEL, `${q.id}.ndjson`), events.map(e => JSON.stringify(e)).join('\n'));
+  await mkdir(join(EVAL, 'runs', RUN_NAME), { recursive: true });
+  await writeFile(join(EVAL, 'runs', RUN_NAME, `${q.id}.ndjson`), events.map(e => JSON.stringify(e)).join('\n'));
   const calls: { name: string; ok: boolean; error?: string; zju: boolean; input: unknown }[] = [];
   const pending = new Map<string, number>();
   for (const e of events) {
@@ -142,5 +145,5 @@ for (const q of questions.filter(q => !ONLY || ONLY.includes(q.id))) {
 }
 const passed = rows.filter(r => r.pass).length;
 process.stdout.write(`\nDSH + ${MODEL}：${passed}/${rows.length} 通过，中文回答 ${rows.filter(r => r.chinese).length}/${rows.length}\n`);
-await writeFile(join(EVAL, `result-${MODEL.replace(/[^\w.-]/g, '_')}.json`), JSON.stringify(rows, null, 2));
+await writeFile(join(EVAL, `result-${RUN_NAME.replace(/[^\w.-]/g, '_')}.json`), JSON.stringify(rows, null, 2));
 process.exitCode = passed === rows.length ? 0 : 1;

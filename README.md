@@ -15,12 +15,12 @@
 | 2 | 学在浙大迁移（原 `zju-tronclass` 24 个工具 → 3 个 `zju_auth_*` + 21 个 `xzzd_*`） | 完成（真机只读冒烟通过） |
 | 3 | 教务（ZDBK）：课表、成绩与绩点、考试安排（只读，4 个 `zdbk_*`） | 完成（真机只读冒烟通过） |
 | 4 | 智云课堂：我的堂次、课程堂次、课堂转录、PPT 时间轴与截图下载（6 个 `zhiyun_*`） | 完成（真机只读冒烟通过） |
-| 5 | lite 补全（课程学分）、技能文档、Codex / Claude Code / DSH / 通用客户端包装、本地模型固定题实测 | 完成（ornith-1.5-9b 10/10，见 [docs/lite-eval.md](docs/lite-eval.md)） |
+| 5 | lite 补全（课程学分）、技能文档、Codex / Claude Code / DSH / 通用客户端包装、本地模型固定题实测 | 完成（直连 LM Studio：ornith-1.5-9b 10/10；真实 DSH：9B、27B 各 9/10，见 [docs/lite-eval.md](docs/lite-eval.md)） |
 | 6 | 拼题A：我的题集与截止、题集详情与进度、题目列表、题面（只读，4 个 `pta_*`；浏览器 Cookie 导入） | 完成（真机只读冒烟通过） |
 | 7 | CC98：搜帖、读帖、十大、版面、用户、通知、私信（读）；回帖、发帖、私信（两步确认写，16 个 `cc98_*`） | 完成（读接口经 WebVPN 真机验证；写操作未实测，需你点名具体帖子） |
 | 8 | 学习通（可选，默认不加载）：课程、作业与截止、考试、通知、课表（只读，6 个 `xxt_*`；浏览器 Cookie 导入）；启用后 `zju_deadlines` 并入学习通作业 | 完成（真机只读验证）；课件同步、资料区、云盘暂未移植 |
 
-full 档目前 54 个工具（启用学习通后 60 个）。lite 档 16 个（工具目录 4,595 字符）：`zju_deadlines`、`zju_courses`、`zju_assignment`、`zju_materials`、`zju_sync`、`zju_search`、`zju_prepare_submission`、`zju_submit`（学在浙大），`zju_schedule`、`zju_exams`、`zju_grades`（教务），`zju_lectures`、`zju_transcript`（智云），`pta_problem`（拼题A；`zju_deadlines` 同时列出拼题A 题集截止），`cc98_search`、`cc98_topic`（CC98）。
+full 档目前 54 个工具（启用学习通后 60 个）。lite 档 16 个（工具目录约 4,600 字符）：`zju_deadlines`、`zju_courses`、`zju_assignment`、`zju_materials`、`zju_sync`、`zju_search`、`zju_prepare_submission`、`zju_submit`（学在浙大），`zju_schedule`、`zju_exams`、`zju_grades`（教务），`zju_lectures`、`zju_transcript`（智云），`pta_problem`（拼题A），`zju_deadlines` 把学在浙大作业、拼题A 题集（和启用时的学习通作业）合并成一个按截止时间排好序的列表，`cc98_search`、`cc98_topic`（CC98）。
 
 ## 安装
 
@@ -48,6 +48,7 @@ npm run configure -- webvpn           # 校外访问需要：WebVPN 用“上网
 | Codex | `build/codex/zju-omni/`：`.codex-plugin/plugin.json`、`.mcp.json`、`skills/zju`、`dist`、生产依赖（Codex 会把插件复制进缓存，所以自包含） | 在 `~/.agents/plugins/marketplace.json` 加一条本地来源，`codex plugin add zju-omni@personal`（命令会打印具体条目） |
 | Claude Code | `build/claude/`：本地插件市场 + `zju-omni/` 插件（`.claude-plugin/plugin.json`、`.mcp.json` 用 `${CLAUDE_PLUGIN_ROOT}`、`skills/zju`） | `claude plugin marketplace add <build/claude 绝对路径>`，`claude plugin install zju-omni@zju-omni` |
 | DSH | `build/dsh/zju-omni.cordis.patch.yml`：`dsh-mcp-client`（lite，工具超时 120 s）+ `dsh-skill-filesystem`（只加载 `zju-lite`） | 把片段追加到 `~/.dsh/profiles/<profile>/cordis.patch.yml`，重启 DSH。工具名形如 `mcp__zju__zju_deadlines` |
+| DSH 精简"浙大助手" | `build/dsh/zju-assistant.patch.yml`：叠加在上一行之上，去掉 bash、文件、网页、子代理、计划、待办等工具和编程人设，换成中文校园助手提示，并关掉技能 | 给本地小模型用。每次请求从约 40 KB（43 个工具）降到约 6.4 KB（只剩 16 个 zju 工具）。建议放进单独的 profile，或 `dsh <profile> --patch …/zju-omni.cordis.patch.yml --patch …/zju-assistant.patch.yml`。会影响整个 profile，不要叠加到日常写代码用的 profile 上 |
 | 其他 MCP 客户端 | [packaging/mcp.json](packaging/mcp.json) | `node /绝对路径/dist/server.js`，stdio；`MCP_TOOL_PROFILE` 选 full 或 lite |
 
 包装模板在 `packaging/`，生成脚本是 `scripts/package.ts`。
@@ -77,6 +78,7 @@ npm test                                       # 单元 + MCP 协议测试（无
 npm run typecheck
 npm run smoke [-- --lite] [-- --only=zhiyun]   # 真机只读冒烟：只调用读工具，只输出计数、错误码和字段名
 npm run eval:lite -- --model=ornith-1.5-9b     # 本地模型固定题实测（需 LM Studio 服务），写操作被拦截
+node tests/lite-eval/dsh.ts --model=<模型> [--lean]  # 真实 DSH headless 实测（隔离 DSH_HOME，--lean 叠加精简预设）
 ```
 
 ## 设计要点
@@ -89,6 +91,7 @@ npm run eval:lite -- --model=ornith-1.5-9b     # 本地模型固定题实测（�
 - **自动重登**：读操作会话失效时重登一次并重试；写操作先做只读预检，写请求一旦发出绝不重放。
 - **写操作**：一律 `prepare`（预览 + `plan_id`，15 分钟有效）→ `execute` → 读回核对；结果不确定时报告 `accepted_unverified` / `OUTCOME_UNKNOWN`，不自动重试。
 - **限速**：每个平台请求串行，最小间隔 200 ms。
+- **小模型友好**：lite 里需要计算或合并的值都在服务端算好：截止列表合并排序并带北京时间、星期和剩余时间，附 `today`；课程返回总学分和缺学分课程；成绩写明学期（如“2025-2026 春夏”）和当前学期；转录每 5 分钟一个时间戳、8000 字一段，并提示概括时不必读完。两分钟内重复的相同查询直接提示模型回答。
 - **输出**：full 返回 `structuredContent`（`{ok, data|error, meta}`）；lite 去掉 `null`、空数组、`url`、`meta`，正文默认 ≤6000 字，用 `next_offset` 续读。lite 工具目录由测试锁定 ≤6000 字符。
 
 ## 目录

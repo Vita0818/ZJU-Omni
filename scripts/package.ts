@@ -76,8 +76,10 @@ async function dsh() {
   const quote = (value: string) => value.replace(/'/g, "''");
   const patch = template.replaceAll('__NODE__', `'${quote(nodePath())}'`).replaceAll('__ROOT__', quote(ROOT)).replaceAll('__SKILLS__', quote(join(target, 'skills')));
   await writeFile(join(target, 'zju-omni.cordis.patch.yml'), patch);
+  await cp(join(ROOT, 'packaging/dsh/zju-assistant.patch.yml'), join(target, 'zju-assistant.patch.yml'));
   console.log(`DSH 配置片段已生成：${join(target, 'zju-omni.cordis.patch.yml')}
-安装：把其中的条目追加到 ~/.dsh/profiles/<profile>/cordis.patch.yml（例如 desktop），重启 DSH。`);
+安装：把其中的条目追加到 ~/.dsh/profiles/<profile>/cordis.patch.yml（例如 desktop），重启 DSH。
+精简"浙大助手"叠加层：${join(target, 'zju-assistant.patch.yml')}（去掉 bash/文件/网页/子代理等工具和编程人设，适合本地小模型；建议放进单独的 profile，或用 --patch 叠加）。`);
 }
 
 const which = process.argv[2] ?? 'all';
