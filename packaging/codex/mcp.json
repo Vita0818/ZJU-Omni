@@ -4,7 +4,7 @@
       "command": "./scripts/start.sh",
       "args": [],
       "cwd": ".",
-      "env_vars": ["MCP_TOOL_PROFILE", "ZJU_PLATFORMS", "ZJU_NETWORK", "ZJU_OMNI_DATA_DIR", "ZJU_XZZD_STORAGE_HOSTS", "ZJU_USERNAME", "ZJU_PASSWORD"]
+      "env_vars": ["ZJU_PLATFORMS", "ZJU_NETWORK", "ZJU_OMNI_DATA_DIR", "ZJU_XZZD_STORAGE_HOSTS", "ZJU_USERNAME", "ZJU_PASSWORD"]
     }
   }
 }

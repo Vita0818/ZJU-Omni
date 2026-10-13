@@ -65,6 +65,8 @@
 - `zju_transcript` 每 5 分钟一个时间戳、同段合并，8000 字一页，并给出 `page`（如 1/4）和“概括读 1–2 段即可”的提示；一节 5 万字的课从 9 页降到约 4 页。
 - `zju_deadlines` 每项加 `left`（“还剩 4 小时”“已过期 3 天”）。
 
-`packaging/dsh/preset.patch.yml`（ZJU-Omni 预设，DSH 组合包补丁）：用假的 OpenAI 接口抓 DSH 实际发出的请求测得：标准 headless 一次请求约 40 KB、43 个工具，加上本叠加层后约 6.4 KB、16 个工具（只剩 zju 工具），系统提示换成中文校园助手。工具调用全链路已用假模型验证。`node tests/lite-eval/dsh.ts --model=<模型> --lean` 使用该预设，结果写到 `result-<模型>-lean.json`。
+`packaging/dsh/lite.patch.yml`（ZJU-Omni Lite 的 DSH 组合包补丁）：用假的 OpenAI 接口抓 DSH 实际发出的请求测得：标准 headless 一次请求约 40 KB、43 个工具，加上本叠加层后约 6.4 KB、16 个工具（只剩 zju 工具），系统提示换成中文校园助手。工具调用全链路已用假模型验证。`node tests/lite-eval/dsh.ts --model=<模型> --lean` 使用该预设，结果写到 `result-<模型>-lean.json`。
 
 已用打包的 tgz 在隔离的 DSH_HOME 里实装验证：`dsh plugin --profile zju-omni add <tgz>` 自动把 `zju-omni` 加进 profile 的 bundles，服务用 DSH 自带的 Node 从 profile 的 node_modules 启动，假模型调用 `zju_exams` 拿到了真实数据。
+
+之后按版本拆成两个组合包：`zju-omni`（full，只加工具和 `zju` 技能）与 `zju-omni-lite`（lite + 精简预设，服务名 `zju_lite`）。在隔离的 DSH_HOME 里分别装进两个 profile 验证：装标准版的 profile 保留 bash 等全部 81 个工具，其中 54 个是 `mcp__zju__…`，并加载了 `zju` 技能，假模型调用 `zdbk_list_exams` 成功；装 Lite 版的 profile 只有 16 个 `mcp__zju_lite__…` 工具和中文提示，调用 `zju_exams` 成功。Codex、Claude Code 的插件包也同样生成两个版本，Claude 插件市场通过 `claude plugin validate`。

@@ -1,0 +1,28 @@
+# ZJU-Omni for DeepSeek Harness (bundle patch of the zju-omni package).
+#
+# Adds the full ZJU-Omni MCP server and its skill to the profile and changes
+# nothing else, so it can go into an everyday profile (including desktop).
+# The server runs with DSH's own Node (process.execPath + ELECTRON_RUN_AS_NODE)
+# from this package inside the profile's node_modules. ZJU_OMNI_SERVER overrides
+# the server path (used by the repository's own eval).
+- insert:
+    - id: zju-omni
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: zju
+        transport: stdio
+        command: !!js process.execPath
+        args:
+          - !!js "process.env.ZJU_OMNI_SERVER || `${ctx.get('profileContext').dir}/node_modules/zju-omni/dist/server.js`"
+        env:
+          ELECTRON_RUN_AS_NODE: '1'
+          MCP_TOOL_PROFILE: full
+        toolCallTimeoutMs: 120000
+    - id: zju-omni-skills
+      name: '@deepseek-ai/dsh-skill-filesystem'
+      config:
+        providerName: zju-omni
+        includeDefaultRoots: false
+        watch: false
+        customSkillDirs:
+          - !!js "`${ctx.get('profileContext').dir}/node_modules/zju-omni/skills`"

@@ -20,7 +20,7 @@ const TIMEOUT_MS = Number(arg('timeout', '420000'));
 const EVAL = join(ROOT, 'build', 'dsh-eval');
 const ZJU_PATCH = join(ROOT, 'build', 'dsh', 'zju-omni.cordis.patch.yml');
 const LEAN = process.argv.includes('--lean');
-const PRESET = join(ROOT, 'packaging', 'dsh', 'preset.patch.yml');
+const PRESET = join(ROOT, 'packaging', 'dsh', 'lite.patch.yml');
 // Run outside the repository, as a real user would, so the model cannot browse this source tree.
 const WORK = join(tmpdir(), 'zju-omni-dsh-eval-work');
 
@@ -103,7 +103,7 @@ for (const q of questions.filter(q => !ONLY || ONLY.includes(q.id))) {
   for (const e of events) {
     if (e.type === 'tool_call') {
       pending.set(e.callId, calls.length);
-      calls.push({ name: String(e.tool).replace(/^mcp__zju__/, ''), ok: true, zju: String(e.tool).startsWith('mcp__zju__'), input: e.input });
+      calls.push({ name: String(e.tool).replace(/^mcp__zju(_lite)?__/, ''), ok: true, zju: /^mcp__zju(_lite)?__/.test(String(e.tool)), input: e.input });
     } else if (e.type === 'tool_result' && pending.has(e.callId)) {
       const call = calls[pending.get(e.callId)!];
       call.ok = e.status === 'completed';

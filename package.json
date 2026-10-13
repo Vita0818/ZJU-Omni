@@ -11,18 +11,6 @@
     "zju-omni": "dist/server.js",
     "zju-omni-cli": "dist/cli.js"
   },
-  "files": [
-    "dist",
-    "packaging/dsh/preset.patch.yml",
-    "skills",
-    "README.md",
-    "LICENSE"
-  ],
-  "dsh": {
-    "bundle": {
-      "patch": "./packaging/dsh/preset.patch.yml"
-    }
-  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.tests.json",
@@ -35,7 +23,7 @@
     "smoke": "node tests/smoke/readonly.ts",
     "package": "npm run build && node scripts/package.ts",
     "eval:lite": "node tests/lite-eval/run.ts",
-    "pack:dsh": "npm run build && mkdir -p build/release && npm pack --pack-destination build/release"
+    "pack:dsh": "npm run build && node scripts/package.ts bundles"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",
@@ -49,5 +37,10 @@
     "name": "Vita0818",
     "url": "https://github.com/Vita0818"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Vita0818/ZJU-Omni.git"
+  },
+  "homepage": "https://github.com/Vita0818/ZJU-Omni"
 }
