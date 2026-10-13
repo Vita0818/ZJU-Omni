@@ -73,6 +73,8 @@ dsh plugin --profile campus add <zju-omni-lite-<版本>.tgz 的路径或下载�
 
 也可以在网页或桌面版侧边栏的“插件”页安装；DSH 接受 npm 包名、GitHub 地址、tgz 地址和本地路径。仓库不提交 `dist/`，从 GitHub 地址直接安装需要现场构建，所以推荐发布 tgz（GitHub Release 附件，或发布到 npm）。安装后在 profile 里配置模型，首次使用前在终端配置账号：仓库里是 `npm run configure`，只装了组合包时是 `node ~/.dsh/profiles/<profile>/node_modules/<包名>/dist/cli.js configure`。账号和会话保存在本机，所有版本和客户端共用。
 
+如果安装报 `ERR_PNPM_MISSING_TARBALL_INTEGRITY`（pnpm 从缓存里取同一个 tgz 时没有记下校验值），删掉该 profile 的 `pnpm-lock.yaml`，清一次 pnpm 缓存（`pnpm store prune`）后重装即可。
+
 ## 环境变量
 
 | 变量 | 取值 | 默认 |
