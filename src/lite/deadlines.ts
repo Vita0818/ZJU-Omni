@@ -33,6 +33,19 @@ export function beijing(iso: string | null, withTime = true): string | null {
   return withTime ? `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute} ${weekday}` : `${p.year}-${p.month}-${p.day} ${weekday}`;
 }
 
+/** "还剩 7 小时" / "还剩 2 天 3 小时" / "已过期 5 天". */
+export function remaining(iso: string | null, now: Date): string | undefined {
+  const t = iso ? Date.parse(iso) : NaN;
+  if (!Number.isFinite(t)) return undefined;
+  const diff = t - now.getTime();
+  const minutes = Math.floor(Math.abs(diff) / 60000);
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+  const span = days > 0 ? `${days} 天${hours ? ` ${hours} 小时` : ''}` : hours > 0 ? `${hours} 小时` : `${Math.max(minutes, 1)} 分钟`;
+  if (diff < 0) return `已过期 ${days > 0 ? `${days} 天` : span}`;
+  return `还剩 ${span}`;
+}
+
 /** Upcoming (soonest first), then overdue (most recent first), then unknown deadlines. */
 export function mergeDeadlines(items: DeadlineInput[], now: Date) {
   const nowMs = now.getTime();
@@ -50,6 +63,7 @@ export function mergeDeadlines(items: DeadlineInput[], now: Date) {
       course: item.course ?? undefined,
       title: item.title,
       due: beijing(item.due_iso) ?? '截止时间未知',
+      left: remaining(item.due_iso, now),
       overdue: r.group === 1 || undefined,
       status: item.status,
       solved: item.solved,

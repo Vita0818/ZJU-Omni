@@ -74,6 +74,10 @@ test('transcripts are timestamped, paged by characters, and missing data is not 
   assert.equal(page.next_offset, 10);
   const plain = await reader.transcript({ sub_id: 101, with_timestamps: false });
   assert.equal(plain.text, '同学们好\n今天讲链表');
+  const compact = await reader.transcript({ sub_id: 101, timestamp_every_sec: 60 });
+  assert.equal(compact.text, '[00:00:01] 同学们好\n[00:01:05] 今天讲链表');
+  const block = await reader.transcript({ sub_id: 101, timestamp_every_sec: 300 });
+  assert.equal(block.text, '[00:00:01] 同学们好 今天讲链表');
   mode = 'none';
   const none = await reader.transcript({ sub_id: 101 });
   assert.equal(none.available, false);

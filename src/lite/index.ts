@@ -12,7 +12,7 @@ import type { Cc98Services } from '../platforms/cc98/index.ts';
 import { searchShape as cc98SearchShape, topicShape as cc98TopicShape } from '../platforms/cc98/tools.ts';
 import { problemShape } from '../platforms/pta/tools.ts';
 import { courseLecturesShape, myLecturesShape, transcriptShape } from '../platforms/zhiyun/tools.ts';
-import { courseCodeOfKey, TERMS } from '../platforms/zdbk/parse.ts';
+import { courseCodeOfKey, currentTerm, TERMS } from '../platforms/zdbk/parse.ts';
 import { examsShape, gradesShape, timetableShape } from '../platforms/zdbk/tools.ts';
 import { assignmentScanShape, assignmentShape, identifier, searchShape, submissionShape, syncShape } from '../platforms/xzzd/tools.ts';
 
@@ -133,8 +133,19 @@ function xzzdLite(x: XzzdServices, zdbk?: ZdbkServices, pta?: PtaServices, xxt?:
               creditError = e?.code ?? 'INTERNAL_ERROR';
             }
           }
+          const courses = r.courses.map(c => ({ course_id: c.id, name: c.name, code: displayCode(c.course_code), credit: credits?.get(String(c.course_code)), semester: c.semester, teachers: c.instructors.join('、') || undefined }));
+          const known = courses.filter(c => typeof c.credit === 'number');
+          const creditSummary = credits
+            ? {
+                credit_total: Math.round(known.reduce((sum, c) => sum + (c.credit as number), 0) * 10) / 10,
+                credit_missing: courses.filter(c => typeof c.credit !== 'number').map(c => c.name),
+                credit_note: `credit_total 已算好，是 ${known.length} 门有学分课程的合计；credit_missing 里的课程平台没有给出学分，原因未知，不要猜测。`,
+              }
+            : {};
           return {
-            courses: r.courses.map(c => ({ course_id: c.id, name: c.name, code: displayCode(c.course_code), credit: credits?.get(String(c.course_code)), semester: c.semester, teachers: c.instructors.join('、') || undefined })),
+            courses,
+            course_count: courses.length,
+            ...creditSummary,
             scope,
             next_page: r.next_page,
             credit_error: creditError,
@@ -312,18 +323,24 @@ function zdbkLite({ client, reader }: ZdbkServices): LiteTool[] {
       run: args =>
         read(async () => {
           const r = await reader.grades(args);
+          const now = currentTerm();
+          const label = (year: string | null, semester: number | null) => (year ? `${year} ${semester === 1 ? '秋冬' : semester === 2 ? '春夏' : ''}`.trim() : undefined);
           return {
+            current_semester: `${now.academic_year} ${now.term === '春' || now.term === '夏' ? '春夏' : '秋冬'}`,
+            note: 'gpa/avg/credits 是全部已出成绩的累计值；term 是每门课所属学期，当前学期的课一般要期末后才出成绩。',
             gpa: r.summary.gpa_5,
             gpa_4_3: r.summary.gpa_4_3,
             avg: r.summary.average_score,
             credits: r.summary.earned_credits,
-            grades: r.grades.slice(0, 80).map(g => ({ course: g.name, term: g.academic_year ? `${g.academic_year}-${g.semester}` : undefined, credit: g.credit, score: g.score, gp: g.grade_point })),
+            grades: r.grades.slice(0, 80).map(g => ({ course: g.name, term: label(g.academic_year, g.semester), credit: g.credit, score: g.score, gp: g.grade_point })),
             more: r.grades.length > 80 ? r.grades.length - 80 : undefined,
           };
         }),
     },
   ];
 }
+
+const TRANSCRIPT_PAGE = 8000;
 
 function zhiyunLite({ client, reader }: ZhiyunServices): LiteTool[] {
   const read = <T>(fn: () => Promise<T>) => client.withSession(fn, { readOnly: true });
@@ -343,14 +360,26 @@ function zhiyunLite({ client, reader }: ZhiyunServices): LiteTool[] {
     {
       name: 'zju_transcript',
       title: '课堂转录',
-      description: '读取某堂课（sub_id）的语音转录文字。长文用 next_offset 续读。',
+      description: '读取某堂课（sub_id）的语音转录文字（每 5 分钟一个时间戳）。长文用 next_offset 续读。',
       input: { sub_id: num, offset: num.optional() },
       strict: transcriptShape,
-      defaults: { max_characters: 6000 },
+      defaults: { max_characters: TRANSCRIPT_PAGE },
       run: args =>
         read(async () => {
-          const r = await reader.transcript(args);
-          return { available: r.available, text: r.text, next_offset: r.next_offset, total: r.total_characters, note: r.available ? undefined : r.note };
+          const r = await reader.transcript({ ...args, timestamp_every_sec: 300 });
+          if (!r.available) return { available: false, note: r.note };
+          const pages = Math.max(1, Math.ceil(r.total_characters / TRANSCRIPT_PAGE));
+          const page = Math.floor(Number(args.offset ?? 0) / TRANSCRIPT_PAGE) + 1;
+          return {
+            available: true,
+            page: `${page}/${pages}`,
+            text: r.text,
+            next_offset: r.next_offset,
+            note:
+              r.next_offset == null
+                ? '已是最后一段。'
+                : `全文共 ${pages} 段。只需概括时，读完 1–2 段即可回答，并说明概括基于课程前半部分；用户要细节或完整内容时再用 next_offset 续读。`,
+          };
         }),
     },
   ];

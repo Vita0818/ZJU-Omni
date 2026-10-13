@@ -165,7 +165,7 @@ export class ZhiyunReader {
     return { from: shiftDate(end, -(days - 1)), to: end, lectures, note: '只含本人课表中的课；旁听课请用 zhiyun_search_courses + zhiyun_list_lectures。' };
   }
 
-  async transcript({ sub_id, offset = 0, max_characters = 16000, with_timestamps = true }: { sub_id: unknown; offset?: number; max_characters?: number; with_timestamps?: boolean }) {
+  async transcript({ sub_id, offset = 0, max_characters = 16000, with_timestamps = true, timestamp_every_sec = 0 }: { sub_id: unknown; offset?: number; max_characters?: number; with_timestamps?: boolean; timestamp_every_sec?: number }) {
     const data = await this.api.get(`${YJAPI}/courseapi/v3/web-socket/search-trans-result`, { sub_id: id(sub_id), format: 'json' });
     if (Number(data.code) === 10002) {
       return { sub_id: String(sub_id), available: false, text: '', next_offset: null, total_characters: 0, segments: 0, note: '暂无语音转录（当天课程通常还没转完，或该课未开启转录）。' };
@@ -174,11 +174,28 @@ export class ZhiyunReader {
     if (!Array.isArray(data.list)) throw new ToolError('SCHEMA_CHANGED', '智云课堂转录结果缺少 list。');
     const items: Raw[] = data.list[0]?.all_content ?? [];
     if (!Array.isArray(items)) throw new ToolError('SCHEMA_CHANGED', '智云课堂转录缺少 all_content。');
-    const full = items
-      .map(c => text(c.Text))
-      .map((line, i) => (with_timestamps ? `[${clock(items[i].BeginSec)}] ${line}` : line))
-      .filter(line => line.replace(/^\[[\d:]+\]\s*/, ''))
-      .join('\n');
+    let full: string;
+    if (timestamp_every_sec > 0) {
+      // Compact form: one paragraph per time block, timestamp only at block start.
+      const blocks: string[] = [];
+      let block = -1;
+      for (const item of items) {
+        const line = text(item.Text);
+        if (!line) continue;
+        const b = Math.floor((Number(item.BeginSec) || 0) / timestamp_every_sec);
+        if (b !== block) {
+          block = b;
+          blocks.push(with_timestamps ? `[${clock(Number(item.BeginSec) || 0)}] ${line}` : line);
+        } else blocks[blocks.length - 1] += ` ${line}`;
+      }
+      full = blocks.join('\n');
+    } else {
+      full = items
+        .map(c => text(c.Text))
+        .map((line, i) => (with_timestamps ? `[${clock(items[i].BeginSec)}] ${line}` : line))
+        .filter(line => line.replace(/^\[[\d:]+\]\s*/, ''))
+        .join('\n');
+    }
     const duration = items.length ? Number(items[items.length - 1].EndSec) || null : null;
     return {
       sub_id: String(sub_id),

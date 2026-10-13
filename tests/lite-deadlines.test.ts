@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { beijing, mergeDeadlines } from '../src/lite/deadlines.ts';
+import { beijing, mergeDeadlines, remaining } from '../src/lite/deadlines.ts';
 
 test('deadlines from all sources are merged into one Beijing-time list: upcoming, overdue, unknown', () => {
   const now = new Date('2026-10-12T04:00:00Z');
@@ -16,6 +16,12 @@ test('deadlines from all sources are merged into one Beijing-time list: upcoming
   assert.deepEqual(merged.map(m => m.no), [1, 2, 3, 4, 5, 6]);
   assert.equal(merged[0].due, '2026-10-13 12:00 周二');
   assert.equal(merged[0].overdue, undefined);
+  assert.equal(merged[0].left, '还剩 1 天');
+  assert.equal(merged[3].left, '已过期 10 天');
+  assert.equal(merged[5].left, undefined);
+  assert.equal(remaining('2026-10-12T11:30:00Z', now), '还剩 7 小时');
+  assert.equal(remaining('2026-10-14T07:00:00Z', now), '还剩 2 天 3 小时');
+  assert.equal(remaining('2026-10-12T04:20:00Z', now), '还剩 20 分钟');
   assert.equal(merged[3].overdue, true);
   assert.equal(merged[5].due, '截止时间未知');
   assert.equal(beijing('2026-10-12T04:00:00Z', false), '2026-10-12 周一');
