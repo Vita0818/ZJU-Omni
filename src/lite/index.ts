@@ -102,7 +102,11 @@ function xzzdLite(x: XzzdServices, zdbk?: ZdbkServices, pta?: PtaServices, xxt?:
             next_offset: offset + limit < merged.length ? offset + limit : null,
             complete: r.complete && r.matched_count <= 300,
             error_codes: errorCodes(r.errors),
-            note: ['已按截止时间排好序：先列未到期的（最近的在前），再列已过期的，最后是截止时间未知的。按 no 顺序引用即可。', ...notes].join(' '),
+            note: [
+              '已按截止时间排好序：先列未到期的（no=1 最早截止），再列已过期的，最后是截止时间未知的。问最早或最近的只看前几项，不用翻页；截止时间相同按 no 取第一个。urgent=true 表示 24 小时内截止，回答时要提醒。',
+              '看要求：学在浙大项用 zju_assignment(activity_id)，拼题A项用 pta_problem(problem_set_id)。只有学在浙大作业能用 zju_prepare_submission 交，拼题A和学习通要在网页上交。',
+              ...notes,
+            ].join(' '),
           };
         }),
     },
@@ -354,7 +358,14 @@ function zhiyunLite({ client, reader }: ZhiyunServices): LiteTool[] {
       run: args =>
         read(async () => {
           const r = args.course_id != null ? await reader.courseLectures({ course_id: args.course_id }) : await reader.myLectures(args);
-          return { lectures: r.lectures.map(l => ({ sub_id: l.sub_id, course_id: l.course_id, course: l.course_title, title: l.title, time: l.begins_at?.replace(' +08:00', '') ?? l.date, teacher: l.teacher, place: l.room })) };
+          const newestFirst = [...r.lectures].sort((a, b) => (b.begins_at ?? b.date ?? '').localeCompare(a.begins_at ?? a.date ?? ''));
+          const lectures = newestFirst.map((l, index) => ({ no: index + 1, sub_id: l.sub_id, course_id: l.course_id, course: l.course_title, title: l.title, time: l.begins_at?.replace(' +08:00', '') ?? l.date, upcoming: l.upcoming, teacher: l.teacher, place: l.room }));
+          const started = lectures.find(l => !l.upcoming);
+          return {
+            lectures,
+            latest_started: started ? started.no : undefined,
+            note: '已按开始时间从新到旧排好；upcoming=true 的还没开始，没有转录。“最近一节”就是 latest_started 那一项。',
+          };
         }),
     },
     {

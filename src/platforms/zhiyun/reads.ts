@@ -41,6 +41,7 @@ export interface Lecture {
   begins_at: string | null;
   date: string | null;
   room?: string | null;
+  upcoming?: boolean;
 }
 
 export interface Slide {
@@ -133,6 +134,7 @@ export class ZhiyunReader {
     if (!Number.isInteger(days) || days < 1 || days > 14) throw new ToolError('INVALID_ARGUMENT', 'days 取 1–14。');
     const lectures: (Lecture & { date: string })[] = [];
     const seen = new Set<string>();
+    const now = this.now().getTime() / 1000;
     for (let i = 0; i < days; i++) {
       const day = shiftDate(end, -i);
       const data = await this.api.get(`${CLASSROOM}/courseapi/v2/course-live/get-my-course-day`, { day });
@@ -148,6 +150,7 @@ export class ZhiyunReader {
           const subId = String(c.sub_id ?? '');
           if (!subId || seen.has(subId)) continue;
           seen.add(subId);
+          const begin = Number(c.course_begin ?? c.class_begin);
           lectures.push({
             course_id: String(c.id ?? c.course_id),
             course_title: text(c.title),
@@ -157,12 +160,13 @@ export class ZhiyunReader {
             room: text(c.room_name) || null,
             begins_at: unixToShanghai(c.course_begin ?? c.class_begin),
             date: day,
+            ...(Number.isFinite(begin) && begin > now ? { upcoming: true } : {}),
           });
         }
       }
     }
-    lectures.sort((a, b) => b.date.localeCompare(a.date) || (a.begins_at ?? '').localeCompare(b.begins_at ?? ''));
-    return { from: shiftDate(end, -(days - 1)), to: end, lectures, note: '只含本人课表中的课；旁听课请用 zhiyun_search_courses + zhiyun_list_lectures。' };
+    lectures.sort((a, b) => (b.begins_at ?? b.date).localeCompare(a.begins_at ?? a.date));
+    return { from: shiftDate(end, -(days - 1)), to: end, lectures, note: '按开始时间从新到旧排序；upcoming 表示还没开始。只含本人课表中的课；旁听课请用 zhiyun_search_courses + zhiyun_list_lectures。' };
   }
 
   async transcript({ sub_id, offset = 0, max_characters = 16000, with_timestamps = true, timestamp_every_sec = 0 }: { sub_id: unknown; offset?: number; max_characters?: number; with_timestamps?: boolean; timestamp_every_sec?: number }) {

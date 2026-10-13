@@ -46,9 +46,15 @@ export function remaining(iso: string | null, now: Date): string | undefined {
   return `还剩 ${span}`;
 }
 
+const URGENT_MS = 24 * 3600 * 1000;
+
 /** Upcoming (soonest first), then overdue (most recent first), then unknown deadlines. */
 export function mergeDeadlines(items: DeadlineInput[], now: Date) {
   const nowMs = now.getTime();
+  const urgent = (item: DeadlineInput) => {
+    const t = item.due_iso ? Date.parse(item.due_iso) : NaN;
+    return Number.isFinite(t) && t >= nowMs && t - nowMs <= URGENT_MS;
+  };
   const rank = (item: DeadlineInput) => {
     const t = item.due_iso ? Date.parse(item.due_iso) : NaN;
     if (!Number.isFinite(t)) return { group: 2, key: 0 };
@@ -64,6 +70,7 @@ export function mergeDeadlines(items: DeadlineInput[], now: Date) {
       title: item.title,
       due: beijing(item.due_iso) ?? '截止时间未知',
       left: remaining(item.due_iso, now),
+      urgent: urgent(item) || undefined,
       overdue: r.group === 1 || undefined,
       status: item.status,
       solved: item.solved,

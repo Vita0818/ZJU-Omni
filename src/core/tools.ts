@@ -54,6 +54,50 @@ export function strictArgs<T extends ZodRawShape>(shape: T, args: unknown): z.in
   throw new ToolError('INVALID_ARGUMENT', `参数不合法：${issues}`);
 }
 
+/**
+ * The schema shown to the model: same fields, types, enums and defaults, but
+ * without numeric bounds, string patterns/lengths and array sizes. Those
+ * constraints are still enforced on the server by `strictArgs` against the
+ * original shape, so publishing them only costs context.
+ */
+export function looseSchema(schema: z.ZodType): z.ZodType {
+  const def: any = (schema as any)._zod.def;
+  let out: z.ZodType;
+  switch (def.type) {
+    case 'optional':
+      out = looseSchema(def.innerType).optional();
+      break;
+    case 'nullable':
+      out = looseSchema(def.innerType).nullable();
+      break;
+    case 'default':
+      out = looseSchema(def.innerType).default(def.defaultValue);
+      break;
+    case 'number':
+      out = z.number();
+      break;
+    case 'string':
+      out = z.string();
+      break;
+    case 'array':
+      out = z.array(looseSchema(def.element));
+      break;
+    case 'union':
+      out = z.union(def.options.map((option: z.ZodType) => looseSchema(option)));
+      break;
+    case 'object':
+      out = z.object(looseShape(def.shape));
+      break;
+    default:
+      return schema;
+  }
+  return schema.description ? out.describe(schema.description) : out;
+}
+
+export function looseShape(shape: ZodRawShape): ZodRawShape {
+  return Object.fromEntries(Object.entries(shape).map(([key, value]) => [key, looseSchema(value as z.ZodType)]));
+}
+
 const outputSchema = {
   ok: z.boolean(),
   data: z.unknown().optional(),
@@ -63,10 +107,10 @@ const outputSchema = {
 
 export function registerFull(server: McpServer, tools: FullTool[]): void {
   for (const tool of tools) {
-    server.registerTool(tool.name, { title: tool.title, description: tool.description, inputSchema: tool.input, outputSchema, annotations: annotations(tool) }, async (args: any) => {
+    server.registerTool(tool.name, { title: tool.title, description: tool.description, inputSchema: looseShape(tool.input), outputSchema, annotations: annotations(tool) }, async (args: any) => {
       const meta = { platform: tool.platform, fetched_at: new Date().toISOString() };
       try {
-        const data = await tool.run(args);
+        const data = await tool.run(strictArgs(tool.input, stripUndefined(args)));
         const payload = { ok: true, data, meta };
         return { structuredContent: payload, content: [{ type: 'text' as const, text: JSON.stringify(payload) }] };
       } catch (e) {
@@ -113,6 +157,26 @@ export function registerLite(server: McpServer, tools: LiteTool[], now: () => nu
 function stripUndefined(args: unknown): Record<string, unknown> {
   if (!args || typeof args !== 'object') return {};
   return Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
+}
+
+/**
+ * The SDK stamps every tool schema with a JSON Schema dialect URL ("$schema"),
+ * about 50 characters per tool that no model needs. Wrap the registered
+ * tools/list handler (SDK 1.32 keeps it in `_requestHandlers`) and drop it.
+ * tests/profile.test.ts asserts the result, so an SDK change is caught.
+ */
+export function dropSchemaDialect(server: McpServer): void {
+  const handlers: Map<string, (request: unknown, extra: unknown) => Promise<any>> | undefined = (server.server as any)._requestHandlers;
+  const original = handlers?.get('tools/list');
+  if (!handlers || !original) return;
+  handlers.set('tools/list', async (request, extra) => {
+    const result = await original(request, extra);
+    for (const tool of result?.tools ?? []) {
+      if (tool.inputSchema) delete tool.inputSchema.$schema;
+      if (tool.outputSchema) delete tool.outputSchema.$schema;
+    }
+    return result;
+  });
 }
 
 export interface CatalogEntry {

@@ -115,7 +115,8 @@ npm run pack:dsh                               # 打包两个 DSH 组合包到 b
 - **写操作**：一律 `prepare`（预览 + `plan_id`，15 分钟有效）→ `execute` → 读回核对；结果不确定时报告 `accepted_unverified` / `OUTCOME_UNKNOWN`，不自动重试。
 - **限速**：每个平台请求串行，最小间隔 200 ms。
 - **小模型友好**：lite 里需要计算或合并的值都在服务端算好：截止列表合并排序并带北京时间、星期和剩余时间，附 `today`；课程返回总学分和缺学分课程；成绩写明学期（如“2025-2026 春夏”）和当前学期；转录每 5 分钟一个时间戳、8000 字一段，并提示概括时不必读完。两分钟内重复的相同查询直接提示模型回答。
-- **输出**：full 返回 `structuredContent`（`{ok, data|error, meta}`）；lite 去掉 `null`、空数组、`url`、`meta`，正文默认 ≤6000 字，用 `next_offset` 续读。lite 工具目录由测试锁定 ≤6000 字符。
+- **输出**：full 返回 `structuredContent`（`{ok, data|error, meta}`）；lite 去掉 `null`、空数组、`url`、`meta`，正文默认 ≤6000 字，用 `next_offset` 续读。
+- **工具目录精简**：发布给模型的 schema 只含字段、类型、枚举和默认值，上下限、正则等在服务端校验，不发布 `$schema`。测试锁定 lite ≤6,000 字符、full ≤18,000 字符。原则见 [docs/tool-design.md](docs/tool-design.md)。
 
 ## 目录
 

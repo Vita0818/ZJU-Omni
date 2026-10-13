@@ -70,3 +70,24 @@
 已用打包的 tgz 在隔离的 DSH_HOME 里实装验证：`dsh plugin --profile zju-omni add <tgz>` 自动把 `zju-omni` 加进 profile 的 bundles，服务用 DSH 自带的 Node 从 profile 的 node_modules 启动，假模型调用 `zju_exams` 拿到了真实数据。
 
 之后按版本拆成两个组合包：`zju-omni`（full，只加工具和 `zju` 技能）与 `zju-omni-lite`（lite + 精简预设，服务名 `zju_lite`）。在隔离的 DSH_HOME 里分别装进两个 profile 验证：装标准版的 profile 保留 bash 等全部 81 个工具，其中 54 个是 `mcp__zju__…`，并加载了 `zju` 技能，假模型调用 `zdbk_list_exams` 成功；装 Lite 版的 profile 只有 16 个 `mcp__zju_lite__…` 工具和中文提示，调用 `zju_exams` 成功。Codex、Claude Code 的插件包也同样生成两个版本，Claude 插件市场通过 `claude plugin validate`。
+
+## 2026-10-13：Gemma 4 12B（QAT）
+
+模型 `gemma-4-12b-it-qat`（LM Studio，上下文 32K，并行 1），真实 DSH headless，题目同上。
+
+| 配置 | 通过 | 单题耗时 | 末步输入 |
+| --- | --- | --- | --- |
+| 精简预设（`--lean`，不加载技能） | 9/10 | 9–67 s | 2.3K–7.9K tok |
+| 标准预设（加载 zju-lite 技能，bash 等内置工具全开） | 9/10 | 23–182 s | 10.4K–19.2K tok |
+
+- 精简预设：作业要求题在两份同时截止的拼题A题集前停下来反问，没有调用 `pta_problem`；交作业题让用户提供拼题A题号，像是能往拼题A交。
+- 标准预设：交作业题 `zju_deadlines` 调了 4 次（判循环），中间对一份未开放的学在浙大作业调用了预览（平台拒绝）；作业要求题跳过最早的拼题A题集读了学在浙大作业；转录题选了列表第一项（13:25），不是最近的一节（18:50）。全程没有调用 bash 等内置工具。
+- 两种预设都答对：总学分 23.5、截止排序、9 场考试与“未公布”考场、GPA、课件、搜索。
+
+据此修改（服务端算好、写进结果）：
+
+- `zju_lectures` 严格按开始时间从新到旧，每项带 `no`，未开始的标 `upcoming`，并给出 `latest_started`；full 的 `zhiyun_my_lectures` 同样改为从新到旧。原来是“日期从新到旧、同一天内从早到晚”，第一项不一定是最近的一节。
+- `zju_deadlines` 每项加 `urgent`（24 小时内截止）；`note` 写明 no=1 即最早截止、问最早的不用翻页、同时截止取第一个、学在浙大项用 `zju_assignment`、拼题A项用 `pta_problem`、只有学在浙大作业能交。
+- 发布的工具 schema 去掉上下限、正则、长度和 `$schema`（服务端照旧严格校验）：lite 4,580 → 3,781 字符，full 26,716 → 16,528 字符。
+
+修改后精简预设复测：**10/10**，单题 10–64 s。作业要求题改为 `zju_deadlines → pta_problem`，列出了 HW5 的 5 道题；转录题选对 18:50 的一节；交作业题明确说明拼题A需在网页提交。转录总结里的“普列亚诺夫”（应为普列汉诺夫）无法核对：DSH 事件日志只保留约 3,000 字的工具结果。

@@ -47,6 +47,22 @@ test('my lectures cover the requested day range, deduplicate and accept map-shap
   await assert.rejects(() => reader.myLectures({ date: '2026/10/12' }), (e: any) => e.code === 'INVALID_ARGUMENT');
 });
 
+test('my lectures are strictly newest first across and within days, with not-yet-started ones flagged', async () => {
+  const at = (iso: string) => String(Date.parse(iso) / 1000);
+  const api = fakeApi({
+    '/courseapi/v2/course-live/get-my-course-day': q => q.day === '2026-10-13'
+      ? { code: 0, list: [{ course: [
+          { id: 1, title: '高级数据结构', sub_id: 201, sub_title: '6-8节', course_begin: at('2026-10-13T05:25:00Z') },
+          { id: 2, title: '社会主义发展史', sub_id: 202, sub_title: '11-13节', course_begin: at('2026-10-13T10:50:00Z') },
+          { id: 3, title: '晚课', sub_id: 203, sub_title: '14节', course_begin: at('2026-10-13T13:00:00Z') },
+        ] }] }
+      : { code: 0, list: [{ course: [{ id: 4, title: '马原', sub_id: 204, sub_title: '6-8节', course_begin: at('2026-10-12T05:25:00Z') }] }] },
+  });
+  const r = await new ZhiyunReader(api, () => new Date('2026-10-13T12:00:00Z')).myLectures({ days: 2 });
+  assert.deepEqual(r.lectures.map(l => l.sub_id), ['203', '202', '201', '204']);
+  assert.deepEqual(r.lectures.map(l => l.upcoming ?? false), [true, false, false, false]);
+});
+
 test('course lectures are flattened from the nested year/month/week map and sorted', async () => {
   const api = fakeApi({
     '/courseapi/v3/multi-search/get-course-detail': q => {

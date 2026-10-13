@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { authTools } from './auth/tools.ts';
 import type { Config } from './core/config.ts';
 import { createContext, type ContextOptions } from './core/context.ts';
-import { registerFull, registerLite } from './core/tools.ts';
+import { dropSchemaDialect, registerFull, registerLite } from './core/tools.ts';
 import { liteTools } from './lite/index.ts';
 import { createRuntime, type Runtime } from './platforms/index.ts';
 
@@ -21,5 +21,6 @@ export function buildServer(cfg: Config, options: ContextOptions = {}): { server
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, { instructions: cfg.profile === 'lite' ? LITE_INSTRUCTIONS : FULL_INSTRUCTIONS });
   if (cfg.profile === 'lite') registerLite(server, liteTools(runtime));
   else registerFull(server, [...authTools(runtime), ...runtime.tools]);
+  dropSchemaDialect(server);
   return { server, runtime };
 }

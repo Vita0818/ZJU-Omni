@@ -17,6 +17,9 @@ test('deadlines from all sources are merged into one Beijing-time list: upcoming
   assert.equal(merged[0].due, '2026-10-13 12:00 周二');
   assert.equal(merged[0].overdue, undefined);
   assert.equal(merged[0].left, '还剩 1 天');
+  assert.equal(merged[0].urgent, true);
+  assert.equal(merged[1].urgent, undefined);
+  assert.equal(merged[3].urgent, undefined);
   assert.equal(merged[3].left, '已过期 10 天');
   assert.equal(merged[5].left, undefined);
   assert.equal(remaining('2026-10-12T11:30:00Z', now), '还剩 7 小时');

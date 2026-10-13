@@ -8,6 +8,14 @@ import { baseEnv, connectServer, ROOT, tempDir } from './helpers.ts';
 
 const LITE_TOOLS = ['cc98_search', 'cc98_topic', 'pta_problem', 'zju_lectures', 'zju_transcript', 'zju_schedule', 'zju_exams', 'zju_grades', 'zju_deadlines', 'zju_courses', 'zju_assignment', 'zju_materials', 'zju_sync', 'zju_search', 'zju_prepare_submission', 'zju_submit'];
 const LITE_BUDGET = 6000;
+const FULL_BUDGET = 18000;
+const BOUND_KEYS = ['$schema', 'pattern', 'minimum', 'maximum', 'exclusiveMinimum', 'minLength', 'maxLength', 'minItems', 'maxItems', 'format'];
+
+function schemaKeys(value: unknown, keys = new Set<string>()): Set<string> {
+  if (Array.isArray(value)) value.forEach(item => schemaKeys(item, keys));
+  else if (value && typeof value === 'object') for (const [key, item] of Object.entries(value)) (keys.add(key), schemaKeys(item, keys));
+  return keys;
+}
 
 test('lite catalog is task-oriented, short and within the fixed character budget', async t => {
   const dataDir = await tempDir(t);
@@ -20,9 +28,27 @@ test('lite catalog is task-oriented, short and within the fixed character budget
   }
   const size = catalogSize(tools);
   assert.ok(size <= LITE_BUDGET, `lite catalog ${size} exceeds ${LITE_BUDGET}`);
-  const full = await connectServer(t, baseEnv(dataDir));
-  const fullSize = catalogSize((await full.listTools()).tools);
-  assert.ok(size * 3 < fullSize, `lite ${size} should stay under a third of full ${fullSize}`);
+  const leaked = BOUND_KEYS.filter(key => schemaKeys(tools.map(tool => tool.inputSchema)).has(key));
+  assert.deepEqual(leaked, [], `lite schemas still publish ${leaked.join(', ')}`);
+});
+
+test('full catalog publishes compact schemas within its budget and still validates strictly', async t => {
+  const dataDir = await tempDir(t);
+  const client = await connectServer(t, baseEnv(dataDir));
+  const { tools } = await client.listTools();
+  const size = catalogSize(tools);
+  assert.ok(size <= FULL_BUDGET, `full catalog ${size} exceeds ${FULL_BUDGET}`);
+  const leaked = BOUND_KEYS.filter(key => schemaKeys(tools.map(tool => tool.inputSchema)).has(key));
+  assert.deepEqual(leaked, [], `full schemas still publish ${leaked.join(', ')}`);
+  for (const tool of tools) assert.ok((tool.description ?? '').length <= 200, `${tool.name} description is too long`);
+  const scan: any = tools.find(tool => tool.name === 'xzzd_list_all_assignments')!.inputSchema;
+  assert.equal(scan.properties.status.default, 'all');
+  assert.deepEqual(scan.properties.status.enum, ['all', 'pending', 'unsubmitted', 'submitted', 'draft', 'unknown']);
+  const traversal: any = await client.callTool({ name: 'xzzd_get_activity', arguments: { activity_id: '../etc' } });
+  assert.equal(traversal.isError, true);
+  assert.equal(traversal.structuredContent.error.code, 'INVALID_ARGUMENT');
+  const tooLarge: any = await client.callTool({ name: 'xzzd_list_courses', arguments: { page_size: 5000 } });
+  assert.equal(tooLarge.structuredContent.error.code, 'INVALID_ARGUMENT');
 });
 
 test('lite skill document stays within 1.5 KB', async () => {
