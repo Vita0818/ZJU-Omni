@@ -1,0 +1,71 @@
+# ZJU-Omni preset for DeepSeek Harness (DSH bundle patch).
+#
+# Installed as a bundle, it adds the ZJU-Omni MCP server (lite tools) and turns the
+# profile into a lean campus assistant for small local models: shell, file, web,
+# sub-agent, planning and skill tools are removed and the coding persona is replaced
+# by a short Chinese instruction. Use it in a dedicated profile, not in a profile you
+# also use for coding.
+#
+# The server runs with DSH's own Node (process.execPath + ELECTRON_RUN_AS_NODE) from
+# this package inside the profile's node_modules. ZJU_OMNI_SERVER overrides the
+# server path (used by the repository's own eval).
+- insert:
+    - id: zju-omni
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: zju
+        transport: stdio
+        command: !!js process.execPath
+        args:
+          - !!js "process.env.ZJU_OMNI_SERVER || `${ctx.get('profileContext').dir}/node_modules/zju-omni/dist/server.js`"
+        env:
+          ELECTRON_RUN_AS_NODE: '1'
+          MCP_TOOL_PROFILE: lite
+        toolCallTimeoutMs: 120000
+- id: system-prompt
+  config:
+    includeHarnessIdentity: false
+    includeRuntimeContext: true
+    personaPrefix: >-
+      你是 ZJU-Omni，浙江大学学生的校园助手，用中文简洁回答。只用 mcp__zju__ 开头的工具查询课程、作业、成绩、考试、课表、课堂回放、拼题A和CC98；
+      不要编造工具没有返回的信息，不要自己推算日期、学分或时间，直接使用工具返回的值；工具提示结果没变时立即回答。
+      交作业、发帖等写操作必须先预览并得到用户明确确认。
+    personaSuffix: ''
+- id: agent-instructions
+  disabled: true
+- id: tool-bash
+  disabled: true
+- id: tool-pwsh
+  disabled: true
+- id: tool-jobs
+  disabled: true
+- id: tool-fs
+  disabled: true
+- id: tool-fs-search
+  disabled: true
+- id: tool-web
+  disabled: true
+- id: tool-todo
+  disabled: true
+- id: tool-goal
+  disabled: true
+- id: tool-workflow
+  disabled: true
+- id: tool-subagent
+  disabled: true
+- id: tool-subagent-fork
+  disabled: true
+- id: tool-subagent-control
+  disabled: true
+- id: tool-subagent-list-agents
+  disabled: true
+- id: plan-mode
+  disabled: true
+- id: tool-plugin-manager
+  disabled: true
+- id: mcp-resources
+  disabled: true
+- id: skill-filesystem
+  disabled: true
+- id: tool-skill
+  disabled: true

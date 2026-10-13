@@ -20,7 +20,7 @@ const TIMEOUT_MS = Number(arg('timeout', '420000'));
 const EVAL = join(ROOT, 'build', 'dsh-eval');
 const ZJU_PATCH = join(ROOT, 'build', 'dsh', 'zju-omni.cordis.patch.yml');
 const LEAN = process.argv.includes('--lean');
-const LEAN_PATCH = join(ROOT, 'build', 'dsh', 'zju-assistant.patch.yml');
+const PRESET = join(ROOT, 'packaging', 'dsh', 'preset.patch.yml');
 // Run outside the repository, as a real user would, so the model cannot browse this source tree.
 const WORK = join(tmpdir(), 'zju-omni-dsh-eval-work');
 
@@ -63,9 +63,9 @@ await writeFile(modelPatch, `- id: llm-pi-ai
 
 function runDsh(prompt: string): Promise<{ events: any[]; stderr: string; timedOut: boolean }> {
   return new Promise(resolve => {
-    const child = spawn(DSH, ['--profile', 'headless', '--patch', ZJU_PATCH, '--patch', modelPatch, ...(LEAN ? ['--patch', LEAN_PATCH] : []), '--json', prompt], {
+    const child = spawn(DSH, ['--profile', 'headless', '--patch', LEAN ? PRESET : ZJU_PATCH, '--patch', modelPatch, '--json', prompt], {
       cwd: WORK,
-      env: { ...process.env, DSH_HOME: join(EVAL, 'home') },
+      env: { ...process.env, DSH_HOME: join(EVAL, 'home'), ZJU_OMNI_SERVER: join(ROOT, 'dist', 'server.js') },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let out = '';

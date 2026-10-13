@@ -48,10 +48,26 @@ npm run configure -- webvpn           # 校外访问需要：WebVPN 用“上网
 | Codex | `build/codex/zju-omni/`：`.codex-plugin/plugin.json`、`.mcp.json`、`skills/zju`、`dist`、生产依赖（Codex 会把插件复制进缓存，所以自包含） | 在 `~/.agents/plugins/marketplace.json` 加一条本地来源，`codex plugin add zju-omni@personal`（命令会打印具体条目） |
 | Claude Code | `build/claude/`：本地插件市场 + `zju-omni/` 插件（`.claude-plugin/plugin.json`、`.mcp.json` 用 `${CLAUDE_PLUGIN_ROOT}`、`skills/zju`） | `claude plugin marketplace add <build/claude 绝对路径>`，`claude plugin install zju-omni@zju-omni` |
 | DSH | `build/dsh/zju-omni.cordis.patch.yml`：`dsh-mcp-client`（lite，工具超时 120 s）+ `dsh-skill-filesystem`（只加载 `zju-lite`） | 把片段追加到 `~/.dsh/profiles/<profile>/cordis.patch.yml`，重启 DSH。工具名形如 `mcp__zju__zju_deadlines` |
-| DSH 精简"浙大助手" | `build/dsh/zju-assistant.patch.yml`：叠加在上一行之上，去掉 bash、文件、网页、子代理、计划、待办等工具和编程人设，换成中文校园助手提示，并关掉技能 | 给本地小模型用。每次请求从约 40 KB（43 个工具）降到约 6.4 KB（只剩 16 个 zju 工具）。建议放进单独的 profile，或 `dsh <profile> --patch …/zju-omni.cordis.patch.yml --patch …/zju-assistant.patch.yml`。会影响整个 profile，不要叠加到日常写代码用的 profile 上 |
+| DSH：ZJU-Omni 预设 | 组合包（bundle），补丁是 [packaging/dsh/preset.patch.yml](packaging/dsh/preset.patch.yml)：加入 ZJU-Omni（lite），并把整个 profile 变成精简的校园助手 | 见下方“DSH 预设”。适合本地小模型；会去掉整个 profile 的 bash、文件等工具，请装在单独的 profile 里 |
 | 其他 MCP 客户端 | [packaging/mcp.json](packaging/mcp.json) | `node /绝对路径/dist/server.js`，stdio；`MCP_TOOL_PROFILE` 选 full 或 lite |
 
 包装模板在 `packaging/`，生成脚本是 `scripts/package.ts`。
+
+### DSH 预设
+
+ZJU-Omni 本身就是一个 DSH 组合包：`package.json` 的 `dsh.bundle.patch` 指向 `packaging/dsh/preset.patch.yml`。装进某个 profile 后：
+
+- 加入 ZJU-Omni MCP 服务（lite），用 DSH 自带的 Node 运行（`process.execPath` + `ELECTRON_RUN_AS_NODE`），从 profile 的 `node_modules/zju-omni` 启动，不依赖本机路径；
+- 去掉 bash、PowerShell、文件、网页、子代理、计划、待办、技能等工具和编程人设，换成中文提示“你是 ZJU-Omni……”，要求不编造、不自己推算日期和学分、写操作先确认；
+- 每次请求从约 40 KB（43 个工具）降到约 6.4 KB（16 个 zju 工具）。
+
+```sh
+npm run pack:dsh                                   # 生成 build/release/zju-omni-<版本>.tgz（含 dist）
+dsh zju-omni --from-default-profile web            # 新建一个 profile（web 模板，浏览器界面）
+dsh plugin --profile zju-omni add /绝对路径/zju-omni-<版本>.tgz   # 或 GitHub Release 上 tgz 的下载地址
+```
+
+DSH 也能在网页或桌面版侧边栏的“插件”页安装组合包；它接受 npm 包名、GitHub 地址、tgz 地址和本地路径。仓库不提交 `dist/`，所以从 GitHub 地址直接安装需要现场构建，推荐用发布的 tgz。安装后在这个 profile 里配置模型（如 LM Studio），首次使用前在终端配置账号：仓库里是 `npm run configure`，只装了组合包时是 `node ~/.dsh/profiles/zju-omni/node_modules/zju-omni/dist/cli.js configure`。账号和会话保存在本机，与安装在哪个 profile 无关。
 
 ## 环境变量
 
@@ -78,7 +94,8 @@ npm test                                       # 单元 + MCP 协议测试（无
 npm run typecheck
 npm run smoke [-- --lite] [-- --only=zhiyun]   # 真机只读冒烟：只调用读工具，只输出计数、错误码和字段名
 npm run eval:lite -- --model=ornith-1.5-9b     # 本地模型固定题实测（需 LM Studio 服务），写操作被拦截
-node tests/lite-eval/dsh.ts --model=<模型> [--lean]  # 真实 DSH headless 实测（隔离 DSH_HOME，--lean 叠加精简预设）
+node tests/lite-eval/dsh.ts --model=<模型> [--lean]  # 真实 DSH headless 实测（隔离 DSH_HOME，--lean 使用 ZJU-Omni 预设）
+npm run pack:dsh                               # 打包 DSH 组合包 build/release/zju-omni-<版本>.tgz
 ```
 
 ## 设计要点

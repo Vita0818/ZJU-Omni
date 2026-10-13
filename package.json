@@ -11,6 +11,18 @@
     "zju-omni": "dist/server.js",
     "zju-omni-cli": "dist/cli.js"
   },
+  "files": [
+    "dist",
+    "packaging/dsh/preset.patch.yml",
+    "skills",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./packaging/dsh/preset.patch.yml"
+    }
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.tests.json",
@@ -22,7 +34,8 @@
     "test": "node --test --test-concurrency=4 \"tests/**/*.test.ts\"",
     "smoke": "node tests/smoke/readonly.ts",
     "package": "npm run build && node scripts/package.ts",
-    "eval:lite": "node tests/lite-eval/run.ts"
+    "eval:lite": "node tests/lite-eval/run.ts",
+    "pack:dsh": "npm run build && mkdir -p build/release && npm pack --pack-destination build/release"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",
